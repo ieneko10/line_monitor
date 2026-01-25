@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Flask Webアプリ{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+    <div style="padding: 20px; background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">
+        <h3 style="color: #155724;">✅ 決済が正常に完了しました！</h3>
+        <p>ご利用ありがとうございました。</p>
+        {% if session_id %}
+        <p><strong>セッションID:</strong> <code>{{ session_id }}</code></p>
+        {% endif %}
+        <div style="margin-top: 15px;">
+            <a href="/" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px;">ホームに戻る</a>
+        </div>
+    </div>
+{% endblock %}

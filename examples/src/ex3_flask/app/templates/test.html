@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Flask Webアプリ{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+    <p>これはテスト用のページです。</p>
+    <div style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107;">
+        <h3>テスト機能</h3>
+        <p>このページでは以下の機能をテストできます：</p>
+        <ul>
+            <li>ルーティング機能</li>
+            <li>テンプレート表示</li>
+            <li>動的コンテンツ生成</li>
+        </ul>
+    </div>
+{% endblock %}

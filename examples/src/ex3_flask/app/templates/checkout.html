@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Flask Webアプリ{% endblock %}
+
+{% block header %}{{ title }}{% endblock %}
+
+{% block content %}
+    <p>決済処理のチェックアウトページです。</p>
+    <div style="margin-top: 20px; padding: 15px; background-color: #d1ecf1; border-left: 4px solid #17a2b8;">
+        <h3>決済処理</h3>
+        <p>このページでは決済処理を模擬的に実装できます：</p>
+        <ul>
+            <li>商品選択</li>
+            <li>支払い方法選択</li>
+            <li>決済処理</li>
+        </ul>
+        <div style="margin-top: 15px;">
+            <a href="/success?session_id=test_session_123" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 4px; margin-right: 10px;">決済成功をテスト</a>
+            <a href="/cancel" style="display: inline-block; padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 4px;">決済キャンセルをテスト</a>
+        </div>
+    </div>
+{% endblock %}

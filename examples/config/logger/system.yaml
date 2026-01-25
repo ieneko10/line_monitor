@@ -1,0 +1,36 @@
+LOGGER_LEVEL: DEBUG
+MODULE_NAME: main  # モジュール名
+LOG_FILE_NAME: main  # ログファイル名
+LOG_EXTENSION: .log  # .log, .ansi
+MAX_LOG_FILE_SIZE: 10 * 1024 * 1024  # 1ファイルの最大サイズ（バイト）
+BACKUP_COUNT: 2  # ログファイルの保持数
+DATE_FORMAT:  # '%Y-%m-%d %H:%M:%S'
+LOG_FORMAT: '%(asctime)s - %(threadName)-20s - %(levelname)-8s - line%(lineno)-4s - %(filename)-20s - %(funcName)-20s - '
+USE_CONSOLE: True  # コンソール出力の有無
+USE_COLOR: True  # ANSIカラーコードを使用するか(コンソール出力に関しては常に適用)
+USE_PC_NAME: False  # ログファイル保存ディレクトリをPC名ごとに分けるか
+
+# カスタムログレベルの設定
+CUSTOM_LEVELS:  # Standard Logging Levels:[DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 50]
+  - NAME: 
+    VALUE: 
+
+# 出力したいカテゴリを指定  
+ENABLED_CATEGORIES:  # logger.info('message', extra={'C': 'data'})のように，extra引数で指定したカテゴリを有効にする
+  DEBUG:
+  INFO:
+
+# カラー設定
+COLOR_CONFIG:   # その色にしたい文字列を正規表現で指定
+  BG:
+    - '\[Recieved Request\]'
+
+  MG:
+    - 
+      pattern: 'user:\s*(U[0-9a-f]+)'
+      group: 1
+
+  LB:
+    - 'False'
+    - 'True'
+  

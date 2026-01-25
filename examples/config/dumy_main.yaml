@@ -1,0 +1,54 @@
+# LOG
+LOGGER:
+  MAIN: './config/logger/system.yaml'
+
+
+# DEBUG
+# true：app.run()を使ってデバッグモードで起動
+# false：cherootのWSGIServerを使って本番モードで起動
+DEBUG: true
+
+
+# PORT
+PORT: 8443
+NGROK: false  # trueにすると，ngrokを使って外部からアクセス可能にする
+SERVER_URL: "https://mil-ai.net"  # NGROKを使わない場合は，ここにサーバのURLを指定する
+
+
+# LINE
+LINE_CHANNEL_SECRET: ''
+LINE_ACCESS_TOKEN: ''
+
+
+# STRIPE
+STRIPE_SECRET: ''
+STRIPE_WEBHOOK: ''
+
+
+# データベースPATH
+SESSIONS_DB: "database/sessions.db"
+LINEBOT_DB: "database/linebot.db"
+
+
+# 値段と時間設定
+ITEM_1:
+  NAME: "1分"
+  PRICE: 500
+  TIME: 60
+ITEM_2:
+  NAME: "5分"
+  PRICE: 1000
+  TIME: 300
+ITEM_3:
+  NAME: "10分"
+  PRICE: 2000
+  TIME: 600
+ITEM_4:
+  NAME: "15分"
+  PRICE: 3000
+  TIME: 900
+
+
+# リッチメニューの設定
+RICHMENU:
+  TEST: 

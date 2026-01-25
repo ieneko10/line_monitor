@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>決済完了</title>
+</head>
+<body>
+    <h1>ご購入ありがとうございます！</h1>
+    <p>決済は正常に完了しました。</p>
+    {% if session_id %}
+    <p>セッションID: {{ session_id }}</p>
+    {% endif %}
+</body>
+</html>

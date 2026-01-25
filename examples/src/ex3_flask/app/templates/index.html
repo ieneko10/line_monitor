@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}ホーム - Flask Webアプリ{% endblock %}
+
+{% block header %}ホームページ{% endblock %}
+
+{% block content %}
+    <p>{{ message }}</p>
+    <div style="margin-top: 20px; padding: 15px; background-color: #e9f4fd; border-left: 4px solid #007bff;">
+        <h3>このアプリケーションについて</h3>
+        <ul>
+            <li>Flask フレームワークを使用したWebアプリケーション</li>
+            <li>テンプレート継承を活用したレスポンシブデザイン</li>
+            <li>エラーハンドリング機能付き</li>
+            <li>RESTful API エンドポイント提供</li>
+        </ul>
+    </div>
+{% endblock %}
