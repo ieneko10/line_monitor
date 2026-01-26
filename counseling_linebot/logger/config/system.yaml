@@ -1,18 +1,19 @@
-LOGGER_LEVEL: DEBUG
-MODULE_NAME: dialogue  # モジュール名
-LOG_FILE_NAME: dialogue  # ログファイル名
-LOG_EXTENSION: .log  # .log, .ansi
+LOGGER_LEVEL: DDEBUG
+MODULE_NAME: system  # モジュール名
+LOG_FILE_NAME: # ログファイル名(複数指定可)
+  - system
+LOG_EXTENSION: .ansi  # .log, .ansi
 MAX_LOG_FILE_SIZE: 10 * 1024 * 1024  # 1ファイルの最大サイズ（バイト）
 BACKUP_COUNT: 5  # ログファイルの保持数
 DATE_FORMAT:  # '%Y-%m-%d %H:%M:%S'
 LOG_FORMAT: '%(asctime)s - %(threadName)-20s - %(levelname)-8s - line%(lineno)-4s - %(filename)-20s - %(funcName)-20s - '
-USE_CONSOLE: False  # コンソール出力の有無
-USE_COLOR: False  # ANSIカラーコードを使用するか(コンソール出力に関しては常に適用)
+USE_CONSOLE: True  # コンソール出力の有無
+USE_COLOR: True  # ANSIカラーコードを使用するか(コンソール出力に関しては常に適用)
 USE_PC_NAME: False  # ログファイル保存ディレクトリをPC名ごとに分けるか
 
-# カスタムログレベルの設定
+# カスタムログレベルの設定（カスタムログはset_logger内での実行になるため，実行箇所の追跡は不可）
 CUSTOM_LEVELS:  # Standard Logging Levels:[DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 50]
-  - NAME: DETAILED_DEBUG  # カスタムログレベル名
+  - NAME: DDEBUG  # Detailed Debug
     VALUE: 5
 
 # 出力したいカテゴリを指定  
@@ -22,5 +23,25 @@ ENABLED_CATEGORIES:  # logger.info('message', extra={'C': 'data'})のように�
 
 # カラー設定
 COLOR_CONFIG:   # その色にしたい文字列を正規表現で指定
-  G: 
-    - '\[.*?\]'
+  # ログレベルごとの設定
+  INFO:
+    G: 
+      - '\[.*?\]'
+  DEBUG:
+    C:
+      - '\[.*?\]'
+  DDEBUG:
+    LB:
+      - '\[.*?\]'
+  WARNING:
+    YE:
+      - '\[.*?\]'
+  ERROR:
+    RD:
+      - '\[.*?\]'
+  CRITICAL:
+    BR:
+      - '\[.*?\]'
+  WRITE:
+    G:
+      - '\[.*?\]'

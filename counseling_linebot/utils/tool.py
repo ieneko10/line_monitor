@@ -12,8 +12,8 @@ from typing import List, Dict, Any
 from linebot.v3.messaging import TextMessage
 
 # 自作モジュールのインポート
-from utils.set_logger import start_logger
-from utils.ansi import *
+from logger.set_logger import start_logger
+from logger.ansi import *
 
 
 # 設定の読み込み

@@ -3,8 +3,8 @@ import requests
 
 # 自作モジュールのインポート
 from utils.tool import load_config
-from utils.set_logger import start_logger
-from utils.ansi import *
+from logger.set_logger import start_logger
+from logger.ansi import *
 
 # ロガーと設定の読み込み
 config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'

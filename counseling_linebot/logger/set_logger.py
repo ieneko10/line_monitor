@@ -5,12 +5,12 @@ import yaml
 import os
 import re
 
-from utils.ansi import *
+from logger.ansi import *
 
 # logディレクトリがない場合は作成
-if not os.path.exists('log'):
-    os.makedirs('log')
-    print("Created log directory: log")
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+    print("Created log directory: logs")
 
 class CategoryFilter(logging.Filter):
     def __init__(self, allowed_categories):
@@ -151,7 +151,7 @@ class IndentFormatter(logging.Formatter):
             log = log.replace('\n', '\n' + ' ' * log_length)
 
         if self.use_color:
-            log = highlight_log(log, self.color_config)  # 色付け
+            log = highlight_log(log, self.color_config, record.levelname.strip())  # ログレベルを渡す
         else:
             ansi_pattern = re.compile(r'\033\[[0-9;]*m')
             log = ansi_pattern.sub('', log) 
@@ -168,28 +168,57 @@ class ColorFormatter(logging.Formatter):
 
     def format(self, record):
         log = super().format(record)
-        log = highlight_log(log, self.color_config)
+        log = highlight_log(log, self.color_config, record.levelname)
 
         return log
 
 
 # ─── ログの色付け関数 ──────────────────────────────────────
-def highlight_log(log, color_config):
-    for color, pattern_list in color_config.items():
-        color_code = COLOR_DICT[color]
-        if pattern_list is not None:
-            for value in pattern_list:
-                if isinstance(value, dict):
-                    pattern = value['pattern']
-                    group = value['group']
-                else:
-                    group = 0
-                    pattern = value
-                    
-                if pattern is not None:
-                    log = re.sub(pattern, 
-                                 lambda m: m.group(0).replace(m.group(group), f"{color_code}{m.group(group)}{R}"), 
-                                 log)
+def highlight_log(log, color_config, level_name=None):
+    # ANSIカラーコードで囲まれた部分を一時的にプレースホルダに置き換える
+    ansi_protected = []
+    ansi_pattern = r'(\033\[[0-9;]*m)(.+?)(\033\[0m)'
+    
+    def protect_ansi(match):
+        placeholder = f"__ANSI_PROTECTED_{len(ansi_protected)}__"
+        ansi_protected.append(match.group(0))
+        return placeholder
+    
+    log = re.sub(ansi_pattern, protect_ansi, log)
+    
+    # ログレベル固有の設定を取得（存在する場合）
+    level_specific_config = color_config.get(level_name, {}) if level_name else {}
+    # 共通設定を取得
+    common_config = {k: v for k, v in color_config.items() if not isinstance(v, dict) or k == level_name}
+    
+    # ログレベル固有の設定を優先、次に共通設定を適用
+    configs_to_apply = [level_specific_config, common_config] if level_specific_config else [common_config]
+    
+    for config in configs_to_apply:
+        for color, pattern_list in config.items():
+            if color == level_name:  # レベル名自体はスキップ
+                continue
+            if color not in COLOR_DICT:  # 色コードでない場合はスキップ
+                continue
+            color_code = COLOR_DICT[color]
+            if pattern_list is not None:
+                for value in pattern_list:
+                    if isinstance(value, dict):
+                        pattern = value['pattern']
+                        group = value['group']
+                    else:
+                        group = 0
+                        pattern = value
+                        
+                    if pattern is not None:
+                        log = re.sub(pattern, 
+                                     lambda m: m.group(0).replace(m.group(group), f"{color_code}{m.group(group)}{R}"), 
+                                     log)
+    
+    # プレースホルダを元のANSIカラーコード付き文字列に戻す
+    for i, protected_text in enumerate(ansi_protected):
+        log = log.replace(f"__ANSI_PROTECTED_{i}__", protected_text)
+    
     return log
 
 
@@ -211,15 +240,13 @@ def setting_logger(config) -> logging.Logger:
     enabled_categories = config['ENABLED_CATEGORIES']
     custom_levels = config['CUSTOM_LEVELS']
     use_pc_name = config.get('USE_PC_NAME', False)
-    if use_pc_name:
-        pc_name = socket.gethostname()
-        # pc名ディレクトリがない場合は作成
-        if not os.path.exists(f'log/{pc_name}'):
-            os.makedirs(f'log/{pc_name}')
-            print(f"Created log directory: log/{pc_name}")
-        log_file_path = f'./log/{pc_name}/' + config['LOG_FILE_NAME'] + config['LOG_EXTENSION']
-    else:
-        log_file_path = './log/' + config['LOG_FILE_NAME'] + config['LOG_EXTENSION']
+    
+    # LOG_FILE_NAMEを文字列またはリストとして処理
+    log_file_names = config['LOG_FILE_NAME']
+    if isinstance(log_file_names, str):
+        log_file_names = [log_file_names]
+    
+    log_extension = config['LOG_EXTENSION']
     
     # カスタムログレベルを登録
     if custom_levels != None:
@@ -229,26 +256,39 @@ def setting_logger(config) -> logging.Logger:
     logger = logging.getLogger(module_name) if module_name else logging.getLogger()
     logger = set_logger_level(logger, custom_levels, logger_level)  # ログレベルの設定
 
+    # ルートロガーへの伝播を無効化
+    logger.propagate = False
+
     # フォーマット文字列の設定
     fh_fmt = fmt
     ch_fmt = '%(message)s'
 
-    # ファイルハンドラ (サイズ・世代管理)
-    fh = logging.handlers.RotatingFileHandler(
-        filename=log_file_path,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding='utf-8'
-    )
-    # fh.setLevel(logger_level)
-    fh.setFormatter(IndentFormatter(fh_fmt + '%(message)s', datefmt, use_color=user_color, color_config=color_config))
-    fh.addFilter(CategoryFilter(enabled_categories))
-    logger.addHandler(fh)
+    # 各ログファイルに対してファイルハンドラを作成
+    for log_file_name in log_file_names:
+        if use_pc_name:
+            pc_name = socket.gethostname()
+            # pc名ディレクトリがない場合は作成
+            if not os.path.exists(f'logs/{pc_name}'):
+                os.makedirs(f'logs/{pc_name}')
+                print(f"Created log directory: logs/{pc_name}")
+            log_file_path = f'./logs/{pc_name}/{log_file_name}{log_extension}'
+        else:
+            log_file_path = f'./logs/{log_file_name}{log_extension}'
+        
+        # ファイルハンドラ (サイズ・世代管理)
+        fh = logging.handlers.RotatingFileHandler(
+            filename=log_file_path,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        fh.setFormatter(IndentFormatter(fh_fmt + '%(message)s', datefmt, use_color=user_color, color_config=color_config))
+        fh.addFilter(CategoryFilter(enabled_categories))
+        logger.addHandler(fh)
 
     # コンソールハンドラ
     if use_console:
         ch = logging.StreamHandler()
-        # ch.setLevel(logger_level)
         ch.setFormatter(ColorFormatter(ch_fmt, color_config=color_config))
         ch.addFilter(CategoryFilter(enabled_categories))
         logger.addHandler(ch)
@@ -257,7 +297,7 @@ def setting_logger(config) -> logging.Logger:
 
 
 # ─── 起動用ラッパー ──────────────────────────────────────────
-def start_logger(config_path) -> logging.Logger:
+def start_logger(config_path='./logger/config/system.yaml') -> logging.Logger:
     with open(config_path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     module_name = config.get('MODULE_NAME', 'main')    

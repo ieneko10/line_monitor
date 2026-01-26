@@ -20,9 +20,10 @@ from linebot.v3.messaging.models.flex_container import FlexContainer
 
 
 # 自作モジュールのインポート
+from logger.set_logger import start_logger
+from logger.ansi import *
 from bot import CounselorBot
 from utils import richmenu
-from utils.set_logger import start_logger
 from utils.tool import load_config, split_message
 from utils.db_handler import (
     get_session,

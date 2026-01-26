@@ -1,8 +1,7 @@
 api_key.py
 main.yaml
-richmenu.yaml
 dialogue/
-log/
+logs/
 database/
 survey/
 

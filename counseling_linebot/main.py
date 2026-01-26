@@ -15,11 +15,11 @@ from linebot.v3.messaging import Configuration
 from linebot.v3.webhooks import MessageEvent, FollowEvent, PostbackEvent
 
 # 自作
+from logger.set_logger import start_logger
+from logger.ansi import *
 from bot import CounselorBot
-from utils.ansi import *
 from utils import richmenu
 from utils.maintenance import FileChangeHandler, maintenace_mode_on
-from utils.set_logger import start_logger
 from utils.db_handler import (
     init_db,
     init_settings_table,
@@ -372,7 +372,7 @@ def handle_message(event):
             save_session(user_id, session)
             logger.debug(f'[Save Session] user: {user_id}\n  keyword_accepted: {session["keyword_accepted"]}')
 
-            msg = 'ご同意ありがとうございます。メニューからご希望の時間を選択してください。'
+            msg = 'ご同意ありがとうございます。メニューのShopからご希望の時間を選択してください。'
             logger.debug(f'[Send Message] user: {user_id}\n  {repr(msg)}')
             reply_to_line_user(event, msg)
             richmenu.apply_richmenu(richmenu_ids['START'], user_id)  # 同意後のリッチメニューを適用
