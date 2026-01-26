@@ -553,12 +553,16 @@ def handle_message(event):
 def stripe_webhook():
     payload = request.get_data(as_text=True)
     sig_header = request.headers.get("Stripe-Signature")
+    logger.ddebug(f'[Checkout]')
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        logger.debug(f'[Webhook Event] {event["type"]}\n{format_structure(event, indent=1)}')
     except stripe.error.SignatureVerificationError:
+        logger.error("[Webhook Error] Webhook signature verification failed.\n\t main.yamlのSTRIPE_WEBHOOKを確認してください。")
         return "Webhook signature verification failed", 400
     except stripe.error.StripeError:
+        logger.error("[Webhook Error] Stripe error occurred while processing webhook.")
         return "Stripe error", 400
 
     # 支払い成功イベントを処理
