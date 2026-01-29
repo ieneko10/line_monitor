@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from logger.set_logger import start_logger
 from pathlib import Path
+import yaml
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +28,7 @@ SECRET_KEY = 'django-insecure-c$g7**a)8m9m6tc(l9&g$w%=omzc%d5+1g#m1h_v0v7&ia4yq)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [".ngrok-free.app", "127.0.0.1"]
 
 
 # Application definition
@@ -37,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'counseling_linebot',
+    'line_app'
 ]
 
 MIDDLEWARE = [
@@ -120,3 +125,136 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# main.yaml を読み込み、settings 内で参照できるようにする
+_MAIN_CONFIG_PATH = BASE_DIR / "config" / "main.yaml"
+try:
+    with _MAIN_CONFIG_PATH.open("r", encoding="utf-8") as f:
+        MAIN_CONFIG = yaml.safe_load(f) or {}
+except FileNotFoundError:
+    MAIN_CONFIG = {}
+
+logger = start_logger(MAIN_CONFIG.get("LOGGER", {}).get("SYSTEM", "./logger/config/system.yaml"))
+
+def _mask(value: str, keep: int = 4) -> str:
+    if not isinstance(value, str):
+        return str(value)
+    if len(value) <= keep * 2:
+        return "*" * len(value)
+    return f"{value[:keep]}...{value[-keep:]}"
+
+def _format_value(val: object) -> str:
+    if isinstance(val, str):
+        return val.replace("\n", "\\n")
+    return str(val)
+
+def _log_group(title: str, items: list[tuple[str, object]]) -> None:
+    logger.ddebug(f"[{title}]")
+    for key, val in items:
+        logger.ddebug(f"\t{key}: {_format_value(val)}")
+
+# LOG
+_log_group("LOG", [
+    ("LOGGER.SYSTEM", MAIN_CONFIG.get("LOGGER", {}).get("SYSTEM")),
+    ("LOGGER.DIALOGUE", MAIN_CONFIG.get("LOGGER", {}).get("DIALOGUE")),
+])
+
+# PORT
+_log_group("PORT", [
+    ("PORT", MAIN_CONFIG.get("PORT")),
+    ("NGROK", MAIN_CONFIG.get("NGROK")),
+    ("SERVER_URL", MAIN_CONFIG.get("SERVER_URL")),
+])
+
+# SERVER MAINTENANCE
+_log_group("SERVER_MAINTENANCE", [
+    ("PUSH_FLAG", MAIN_CONFIG.get("PUSH_FLAG")),
+    ("PUSH_MESSAGE", MAIN_CONFIG.get("PUSH_MESSAGE")),
+    ("DEBUG_PUSH_MESSAGE", MAIN_CONFIG.get("DEBUG_PUSH_MESSAGE")),
+    ("DEBUG_USER_ID", MAIN_CONFIG.get("DEBUG_USER_ID")),
+    ("RICHMENU_FLAG", MAIN_CONFIG.get("RICHMENU_FLAG")),
+])
+
+# API KEYS
+_log_group("API_KEYS", [
+    ("OPENAI_API_KEY", _mask(MAIN_CONFIG.get("OPENAI_API_KEY"))),
+    ("GOOGLE_API_KEY", _mask(MAIN_CONFIG.get("GOOGLE_API_KEY"))),
+    ("ANTHROPIC_API_KEY", _mask(MAIN_CONFIG.get("ANTHROPIC_API_KEY"))),
+    ("TELEGRAM_KEY", _mask(MAIN_CONFIG.get("TELEGRAM_KEY"))),
+])
+
+# LINE
+_log_group("LINE", [
+    ("LINE_CHANNEL_SECRET", _mask(MAIN_CONFIG.get("LINE_CHANNEL_SECRET"))),
+    ("LINE_ACCESS_TOKEN", _mask(MAIN_CONFIG.get("LINE_ACCESS_TOKEN"))),
+    ("STAMP", MAIN_CONFIG.get("STAMP")),
+])
+
+# Stripe
+_log_group("Stripe", [
+    ("STRIPE_SECRET", _mask(MAIN_CONFIG.get("STRIPE_SECRET"))),
+    ("STRIPE_WEBHOOK", _mask(MAIN_CONFIG.get("STRIPE_WEBHOOK"))),
+])
+
+# Model設定
+_log_group("MODEL", [
+    ("MODEL_TYPE", MAIN_CONFIG.get("MODEL_TYPE")),
+    ("OPENAI_MODEL", MAIN_CONFIG.get("OPENAI_MODEL")),
+    ("GEMINI_MODEL", MAIN_CONFIG.get("GEMINI_MODEL")),
+    ("TEMPERATURE", MAIN_CONFIG.get("TEMPERATURE")),
+    ("MAX_TOKENS", MAIN_CONFIG.get("MAX_TOKENS")),
+])
+
+# データベースpath
+_log_group("DATABASE_PATHS", [
+    ("SESSIONS_DB", MAIN_CONFIG.get("SESSIONS_DB")),
+    ("LINEBOT_DB", MAIN_CONFIG.get("LINEBOT_DB")),
+])
+
+# リッチメニューID path
+_log_group("RICHMENU", [
+    ("RICHMENU_PATH", MAIN_CONFIG.get("RICHMENU_PATH")),
+])
+
+# 同意設定
+_log_group("CONSENT", [
+    ("NEED_START_KEYWORD", MAIN_CONFIG.get("NEED_START_KEYWORD")),
+    ("KEYWORD_MESSAGE", MAIN_CONFIG.get("KEYWORD_MESSAGE")),
+])
+
+# 対話開始時のメッセージ
+_log_group("INIT_MESSAGE", [
+    ("INIT_MESSAGE", MAIN_CONFIG.get("INIT_MESSAGE")),
+])
+
+# 対話言語
+_log_group("LANGUAGE", [
+    ("LANGUAGE", MAIN_CONFIG.get("LANGUAGE")),
+])
+
+# 値段と時間設定
+_log_group("ITEMS", [
+    ("ITEM_1", MAIN_CONFIG.get("ITEM_1")),
+    ("ITEM_2", MAIN_CONFIG.get("ITEM_2")),
+    ("ITEM_3", MAIN_CONFIG.get("ITEM_3")),
+    ("ITEM_4", MAIN_CONFIG.get("ITEM_4")),
+])
+
+# 2択の回答
+_log_group("YES_NO", [
+    ("YES_ANSWER", MAIN_CONFIG.get("YES_ANSWER")),
+    ("NO_ANSWER", MAIN_CONFIG.get("NO_ANSWER")),
+])
+
+# アンケート設定
+_log_group("SURVEY", [
+    ("SURVEY_INIT_MESSAGE", MAIN_CONFIG.get("SURVEY", {}).get("SURVEY_INIT_MESSAGE")),
+    ("SURVEY_MESSAGES", MAIN_CONFIG.get("SURVEY", {}).get("SURVEY_MESSAGES")),
+    ("SURVEY_LAST_MESSAGE", MAIN_CONFIG.get("SURVEY", {}).get("SURVEY_LAST_MESSAGE")),
+    ("FINISH_MESSAGE", MAIN_CONFIG.get("SURVEY", {}).get("FINISH_MESSAGE")),
+    ("VERYGOOD", MAIN_CONFIG.get("SURVEY", {}).get("VERYGOOD")),
+    ("GOOD", MAIN_CONFIG.get("SURVEY", {}).get("GOOD")),
+    ("FAIR", MAIN_CONFIG.get("SURVEY", {}).get("FAIR")),
+    ("BAD", MAIN_CONFIG.get("SURVEY", {}).get("BAD")),
+    ("VERYBAD", MAIN_CONFIG.get("SURVEY", {}).get("VERYBAD")),
+])

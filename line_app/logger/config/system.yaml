@@ -1,4 +1,4 @@
-LOGGER_LEVEL: DDEBUG
+LOGGER_LEVEL: DEBUG
 MODULE_NAME: system  # モジュール名
 LOG_FILE_NAME: # ログファイル名(複数指定可)
   - system

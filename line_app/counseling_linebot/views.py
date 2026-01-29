@@ -13,18 +13,19 @@ from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration
 from linebot.v3.webhooks import MessageEvent, FollowEvent, PostbackEvent
+from django.conf import settings
 
 # 既存実装の再利用（Flask版と同等機能）
 ROOT_DIR = Path(__file__).resolve().parents[2]
 LEGACY_DIR = ROOT_DIR / "counseling_linebot"
 sys.path.insert(0, str(LEGACY_DIR))
 
-from logger.set_logger import start_logger  # noqa: E402
-from logger.ansi import *  # noqa: F403, E402
-from utils.bot import CounselorBot  # noqa: E402
-from utils import richmenu  # noqa: E402
-from utils.maintenance import FileChangeHandler, maintenace_mode_on  # noqa: E402
-from utils.db_handler import (  # noqa: E402
+from logger.set_logger import start_logger
+from logger.ansi import * 
+from counseling_linebot.utils.bot import CounselorBot
+from counseling_linebot.utils import richmenu 
+from counseling_linebot.utils.maintenance import FileChangeHandler, maintenance_mode_on 
+from counseling_linebot.utils.db_handler import (
 	init_db,
 	init_settings_table,
 	set_maintenance_mode,
@@ -44,7 +45,7 @@ from utils.db_handler import (  # noqa: E402
 	init_survey,
 	save_survey_results,
 )
-from utils.tool import (  # noqa: E402
+from counseling_linebot.utils.tool import (
 	TrackableTimer,
 	format_structure,
 	extract_event_info,
@@ -53,7 +54,7 @@ from utils.tool import (  # noqa: E402
 	create_directory,
 	generate_session_id,
 )
-from utils.main_massage import (  # noqa: E402
+from counseling_linebot.utils.main_message import (
 	shop,
 	reply,
 	start_chat,
@@ -61,7 +62,7 @@ from utils.main_massage import (  # noqa: E402
 	survey,
 	timers,
 )
-from utils.template_message import (  # noqa: E402
+from counseling_linebot.utils.template_message import (
 	reply_to_line_user,
 	push_to_line_user,
 	send_yes_no_buttons,
@@ -71,8 +72,7 @@ from utils.template_message import (  # noqa: E402
 create_directory()
 
 # ロガーと設定の読み込み
-main_config_path = str(LEGACY_DIR / "config" / "main.yaml")
-conf = load_config(main_config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf["LOGGER"]["SYSTEM"])
 
 # ChatGPTのキー
@@ -109,15 +109,14 @@ endpoint_secret = conf["STRIPE_WEBHOOK"]
 # PORT番ポートのHTTPトンネルを開設する
 PORT = conf["PORT"]
 
-# ngrokを使うかどうか
-if conf["NGROK"]:
+# ngrokを使うかどうか（管理コマンド実行時は接続しない）
+if conf["NGROK"] and "runserver" in sys.argv:
 	from pyngrok import ngrok  # noqa: E402
 
 	tunnel = ngrok.connect(PORT, "http").public_url
 else:
 	tunnel = conf["SERVER_URL"] + f":{PORT}"
 logger.info(f"{BG}[Public URL]{R} {tunnel}")
-
 
 # データベースが存在しない場合は初期化
 if not os.path.exists(SESSIONS_DB):
@@ -458,14 +457,14 @@ def handle_message(event):
 				INIT_MESSAGE,
 				api_key=os.environ["OPENAI_API_KEY"],
 				model_name=OPENAI_MODEL,
-				system_prompt_path="prompt/system_prompt.txt",
+				system_prompt_path="./counseling_linebot/prompts/system_prompt.txt",
 				example_files=[
-					"prompt/case1_0.txt",
-					"prompt/case2_0.txt",
-					"prompt/case3_0.txt",
-					"prompt/case4_0.txt",
-					"prompt/case5_0.txt",
-					"prompt/case6_1.txt",
+					"./counseling_linebot/prompts/case1_0.txt",
+					"./counseling_linebot/prompts/case2_0.txt",
+					"./counseling_linebot/prompts/case3_0.txt",
+					"./counseling_linebot/prompts/case4_0.txt",
+					"./counseling_linebot/prompts/case5_0.txt",
+					"./counseling_linebot/prompts/case6_1.txt",
 				],
 			)
 			bot.finish_dialogue(user_id)
@@ -635,6 +634,7 @@ def create_checkout_session1(request):
 			line_id=line_id,
 			tunnel_url=tunnel,
 		)
+		logger.debug(f"[Checkout Session Created] URL: {session.url}")
 		return redirect(session.url, permanent=False)
 	except Exception as e:
 		return JsonResponse({"error": str(e)}, status=400)
@@ -651,6 +651,7 @@ def create_checkout_session2(request):
 			line_id=line_id,
 			tunnel_url=tunnel,
 		)
+		logger.debug(f"[Checkout Session Created] URL: {session.url}")
 		return redirect(session.url, permanent=False)
 	except Exception as e:
 		return JsonResponse({"error": str(e)}, status=400)
@@ -667,6 +668,7 @@ def create_checkout_session3(request):
 			line_id=line_id,
 			tunnel_url=tunnel,
 		)
+		logger.debug(f"[Checkout Session Created] URL: {session.url}")
 		return redirect(session.url, permanent=False)
 	except Exception as e:
 		return JsonResponse({"error": str(e)}, status=400)
@@ -683,6 +685,7 @@ def create_checkout_session4(request):
 			line_id=line_id,
 			tunnel_url=tunnel,
 		)
+		logger.debug(f"[Checkout Session Created] URL: {session.url}")
 		return redirect(session.url, permanent=False)
 	except Exception as e:
 		return JsonResponse({"error": str(e)}, status=400)

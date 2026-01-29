@@ -1,6 +1,4 @@
 import re
-import sqlite3
-import sys
 import random
 import datetime
 from typing import List, Dict, Tuple, Any, Optional
@@ -13,12 +11,13 @@ import re
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
 from logger.ansi import *
-from utils.tool import format_history, load_config
-from utils.db_handler import save_dialogue_history, get_session
+from django.conf import settings
+from counseling_linebot.models import ChatHistory
+from counseling_linebot.utils.tool import format_history
+from counseling_linebot.utils.db_handler import save_dialogue_history, get_session
 
 # ロガーの設定
-config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf['LOGGER']['DIALOGUE'])
 
 # Constants
@@ -31,7 +30,7 @@ SIMILARITY_THRESHOLD = 40
 RESPONSE_GENERATION_TRIALS = 3
 
 # Type Aliases for Clarity
-ChatHistory = List[Dict[str, str]]
+# ChatHistory = List[Dict[str, str]]
 
 class APIClient:
     """
@@ -150,23 +149,8 @@ class CounselorBot:
         """
         Connects to the SQLite database and creates the chat history table if it doesn't exist.
         """
-        try:
-            self.conn = sqlite3.connect(self.db_path)
-            self.cursor = self.conn.cursor()
-            self.cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chat_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT,
-                    speaker TEXT,
-                    message TEXT,
-                    post_time TEXT,
-                    finished INTEGER,
-                    session_id TEXT DEFAULT ''
-                )
-            """)
-            self.conn.commit()
-        except sqlite3.Error as e:
-            logger.error(f"[Database Error] initialization error: {e}")
+        # Django ORMを利用するため、ここではテーブル作成を行わない
+        return
 
     def _load_system_prompt(self) -> str:
         """
@@ -207,22 +191,28 @@ class CounselorBot:
         session_id = session.get('session_id', '')
         try:
             post_time = datetime.datetime.now()
-            self.cursor.execute(
-                "INSERT INTO chat_history (user_id, speaker, message, post_time, finished, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, "user", "[START]", post_time, DIALOGUE_FINISHED, session_id)
+            ChatHistory.objects.create(
+                user_id=user_id,
+                speaker="user",
+                message="[START]",
+                post_time=post_time,
+                finished=DIALOGUE_FINISHED,
+                session_id=session_id,
             )
             save_dialogue_history(user_id, "user", "[START]", session_id, post_time)  # Save to file
-            self.conn.commit()
-            
+
             post_time = datetime.datetime.now()
-            self.cursor.execute(
-                "INSERT INTO chat_history (user_id, speaker, message, post_time, finished, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, "assistant", self.init_message, post_time, DIALOGUE_NOT_FINISHED, session_id)
+            ChatHistory.objects.create(
+                user_id=user_id,
+                speaker="assistant",
+                message=self.init_message,
+                post_time=post_time,
+                finished=DIALOGUE_NOT_FINISHED,
+                session_id=session_id,
             )
             save_dialogue_history(user_id, "assistant", self.init_message, session_id, post_time)  # Save to file
-            self.conn.commit()
             return self.init_message
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.debug(f"[Bot] Error starting conversation for user {user_id}: {e}")
             return "エラーが発生しました。もう一度お試しください。"
 
@@ -232,21 +222,20 @@ class CounselorBot:
         Retrieves the chat history for a given user.
         """
         try:
-            self.cursor.execute(
-                "SELECT speaker, message, finished FROM chat_history WHERE user_id = ? ORDER BY id DESC LIMIT ?",
-                (user_id, context_num)
+            rows = (
+                ChatHistory.objects.filter(user_id=user_id)
+                .order_by("-id")
+                .values_list("speaker", "message", "finished")[:context_num]
             )
-            
-            # 最新から順に，対話履歴を取得（最新順なので，時系列と逆順）
+
             history: ChatHistory = []
-            for speaker, message, finished in self.cursor.fetchall():
+            for speaker, message, finished in rows:
                 if finished == DIALOGUE_FINISHED:
                     break
                 history.append({"role": speaker, "content": message})
-                # logger.debug(f"[Retrieved History]  {{'role': {speaker}, 'content': {message}}}")    
             return history[::-1]
-        
-        except sqlite3.Error as e:
+
+        except Exception as e:
             logger.debug(f"[Bot] Error retrieving chat history for user {user_id}: {e}")
             return []
 
@@ -305,13 +294,16 @@ class CounselorBot:
         session_id = get_session(user_id).get('session_id', '')
         try:
             post_time = datetime.datetime.now()
-            self.cursor.execute(
-                "INSERT INTO chat_history (user_id, speaker, message, post_time, finished, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, "user", "[END]", post_time, DIALOGUE_FINISHED, session_id)
+            ChatHistory.objects.create(
+                user_id=user_id,
+                speaker="user",
+                message="[END]",
+                post_time=post_time,
+                finished=DIALOGUE_FINISHED,
+                session_id=session_id,
             )
             save_dialogue_history(user_id, "user", "[END]", session_id, post_time)  # Save to file
-            self.conn.commit()
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.debug(f"[Bot] Error finishing dialogue for user {user_id}: {e}")
 
     def reply(self, user_id: str, message: str, remove_thought: bool = False, context_num: int = DEFAULT_CONTEXT_NUM) -> str:
@@ -322,30 +314,35 @@ class CounselorBot:
         session_id = get_session(user_id).get('session_id', '')
         try:
             post_time = datetime.datetime.now()
-            self.cursor.execute(
-                "INSERT INTO chat_history (user_id, speaker, message, post_time, finished, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, "user", message, post_time, DIALOGUE_NOT_FINISHED, session_id)
+            ChatHistory.objects.create(
+                user_id=user_id,
+                speaker="user",
+                message=message,
+                post_time=post_time,
+                finished=DIALOGUE_NOT_FINISHED,
+                session_id=session_id,
             )
             save_dialogue_history(user_id, "user", message, session_id, post_time)  # Save to file
-            self.conn.commit()
 
             history = self._get_history(user_id, context_num)
             response, is_finished = self._generate_response(history, user_id=user_id)
 
             post_time = datetime.datetime.now()
-            self.cursor.execute(
-                "INSERT INTO chat_history (user_id, speaker, message, post_time, finished, session_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (user_id, "assistant", response, post_time, 0, session_id)       # [Dialogue Finished]の出現時，対話履歴をリセットする場合は，0をis_finishedに設定
+            ChatHistory.objects.create(
+                user_id=user_id,
+                speaker="assistant",
+                message=response,
+                post_time=post_time,
+                finished=0,
+                session_id=session_id,
             )
             save_dialogue_history(user_id, "assistant", response, session_id, post_time)  # Save to file
-            self.conn.commit()
-            
+
             if remove_thought:
-                # []で囲まれた文字列を削除
                 response = re.sub(r'\[.*?\]', '', response)
-            
+
             return response, is_finished
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.debug(f"[ERROR] Error processing message from user {user_id}: {e}")
             return "エラーが発生しました。もう一度お試しください。", False
 

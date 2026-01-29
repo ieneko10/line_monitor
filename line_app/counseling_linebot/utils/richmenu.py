@@ -1,14 +1,12 @@
-import sys
 import requests
 
 # 自作モジュールのインポート
-from utils.tool import load_config
 from logger.set_logger import start_logger
 from logger.ansi import *
+from django.conf import settings
 
 # ロガーと設定の読み込み
-config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf['LOGGER']['SYSTEM'])
 
 # LINEチャンネルアクセストークン

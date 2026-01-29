@@ -1,5 +1,4 @@
 import os
-import sys
 import threading
 
 from linebot.v3.webhook import WebhookHandler
@@ -22,10 +21,11 @@ from linebot.v3.messaging.models.flex_container import FlexContainer
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
 from logger.ansi import *
-from bot import CounselorBot
-from utils import richmenu
-from utils.tool import load_config, split_message
-from utils.db_handler import (
+from django.conf import settings
+from counseling_linebot.utils.bot import CounselorBot
+from counseling_linebot.utils import richmenu
+from counseling_linebot.utils.tool import load_config, split_message
+from counseling_linebot.utils.db_handler import (
     get_session,
     save_session,
     save_flag,
@@ -38,8 +38,7 @@ from utils.db_handler import (
 )
 
 # ロガーと設定の読み込み
-config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(config_path)
+conf = settings.MAIN_CONFIG
 richmenu_ids = load_config(conf['RICHMENU_PATH'])
 logger = start_logger(conf['LOGGER']['SYSTEM'])
 

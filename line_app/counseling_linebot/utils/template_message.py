@@ -1,5 +1,3 @@
-import sys
-
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.messaging.models import BroadcastRequest
 from linebot.v3.messaging import (
@@ -17,11 +15,11 @@ from linebot.v3.messaging import (
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
 from logger.ansi import *
-from utils.tool import load_config, split_message
+from django.conf import settings
+from counseling_linebot.utils.tool import split_message
 
 # ロガーと設定の読み込み
-config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf['LOGGER']['SYSTEM'])
 
 YES = "1:" + conf["YES_ANSWER"]

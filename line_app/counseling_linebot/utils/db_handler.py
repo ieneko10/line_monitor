@@ -1,16 +1,15 @@
-import sqlite3
 import json
-import sys
 import datetime
 
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
 from logger.ansi import *
-from utils.tool import load_config
+from django.conf import settings
+from django.db import models
+from counseling_linebot.models import Session, Setting, ChatHistory
 
 # ロガーと設定の読み込み
-config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf['LOGGER']['SYSTEM'])
 
 
@@ -37,54 +36,25 @@ def init_db():
     survey: dict[question]: アンケートの回答
     """
     logger.info("[Initializing Database]")
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS sessions (
-            user_id TEXT PRIMARY KEY,
-            session_data TEXT,
-            flag TEXT,
-            time INTEGER DEFAULT 0,
-            survey TEXT
-        )
-        ''')
-    conn.commit()
-    conn.close()
+    # Django ORMを利用するため、ここではテーブル作成を行わない
+    return
 
 def init_settings_table():
     logger.info("[Initializing Settings Table]")
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    return
 
 def set_maintenance_mode(enabled: bool):
     logger.info(f"[Setting Maintenance Mode] {enabled}")
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO settings (key, value)
-        VALUES (?, ?)
-        ON CONFLICT(key) DO UPDATE SET value=excluded.value
-    ''', ('maintenance', str(int(enabled))))
-    conn.commit()
-    conn.close()
+    Setting.objects.update_or_create(
+        key="maintenance",
+        defaults={"value": str(int(enabled))},
+    )
 
 def get_maintenance_mode() -> bool:
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute('SELECT value FROM settings WHERE key = ?', ('maintenance',))
-    row = cursor.fetchone()
-    conn.close()
-    logger.debug(f"[Getting Maintenance Mode] {bool(int(row[0])) if row else False}")
-    return bool(int(row[0])) if row else False
+    setting = Setting.objects.filter(key="maintenance").first()
+    value = bool(int(setting.value)) if setting else False
+    logger.debug(f"[Getting Maintenance Mode] {value}")
+    return value
 
 
 def register_user(user_id):
@@ -96,200 +66,101 @@ def register_user(user_id):
         "finished": True,
         "session_id": ''
     }
-
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT OR REPLACE INTO sessions (user_id, session_data, flag, time, survey)
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        user_id,
-        json.dumps(session_data, ensure_ascii=False),
-        json.dumps('', ensure_ascii=False),
-        0,  # 初期時間
-        json.dumps({}, ensure_ascii=False)  # 初期アンケートは空のリスト
-    ))
-    conn.commit()
-    conn.close()
+    Session.objects.update_or_create(
+        user_id=user_id,
+        defaults={
+            "session_data": session_data,
+            "flag": "",
+            "time": 0,
+            "survey": {},
+        },
+    )
 
 def get_all_users():
     """
     全ユーザのuser_idを取得する
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM sessions")
-    rows = cursor.fetchall()
-    conn.close()
-    
-    if rows:
-        return [row[0] for row in rows]
+    users = list(Session.objects.values_list("user_id", flat=True))
+    if users:
+        return users
     else:
         logger.warning("[Not Found] sessions テーブルにユーザが存在しません。")
         return []
 
 def get_session(user_id):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT session_data FROM sessions WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row != None:
-        return json.loads(row[0])
+    session = Session.objects.filter(user_id=user_id).first()
+    if session is not None:
+        return session.session_data
     else:
         logger.error(f"[Not Found] user_id '{user_id}' のセッションが見つかりません。")
         return None
 
 def save_session(user_id, data):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-
-    # ユーザーが存在するか確認
-    cursor.execute("SELECT 1 FROM sessions WHERE user_id = ?", (user_id,))
-    exists = cursor.fetchone()
-
-    if exists:
-        # セッションデータだけ更新
-        cursor.execute("UPDATE sessions SET session_data = ? WHERE user_id = ?",
-                       (json.dumps(data), user_id))
-    else:
+    updated = Session.objects.filter(user_id=user_id).update(session_data=data)
+    if not updated:
         logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
-
-    conn.commit()
-    conn.close()
     
 
 def reset_all_sessions():
     """
     全ユーザのセッションの"counseling_mode", "survey_mode","survey_progress"をリセットする
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE sessions
-        SET session_data = json_set(session_data, 
-                                    '$.counseling_mode', false, 
-                                    '$.survey_mode', false,
-                                    '$.survey_progress', 0
-        )
-    """)
-    conn.commit()
-    conn.close()
+    for session in Session.objects.all():
+        data = session.session_data or {}
+        data["counseling_mode"] = False
+        data["survey_mode"] = False
+        data["survey_progress"] = 0
+        session.session_data = data
+        session.save(update_fields=["session_data"])
 
 
 
 def delete_session(user_id):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    Session.objects.filter(user_id=user_id).delete()
 
 def get_flag(user_id):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT flag FROM sessions WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row[0]
-    return None
+    return Session.objects.filter(user_id=user_id).values_list("flag", flat=True).first()
 
 def save_flag(user_id, flag):
     """
     ユーザのフラグを保存する
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-
-    # ユーザーが存在するか確認
-    cursor.execute("SELECT 1 FROM sessions WHERE user_id = ?", (user_id,))
-    exists = cursor.fetchone()
-
-    if exists:
-        # フラグだけ更新
-        cursor.execute("UPDATE sessions SET flag = ? WHERE user_id = ?",
-                       (flag, user_id))
-    else:
+    updated = Session.objects.filter(user_id=user_id).update(flag=flag)
+    if not updated:
         logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
-
-    conn.commit()
-    conn.close()
 
 def reset_flag(user_id):
     """
     ユーザのフラグをリセットする
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE sessions SET flag = ? WHERE user_id = ?",
-        ('', user_id)
-    )
-    conn.commit()
-    conn.close()
+    Session.objects.filter(user_id=user_id).update(flag="")
 
 def reset_all_flags():
     """
     全ユーザのフラグをリセットする
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE sessions SET flag = ''")
-    conn.commit()
-    conn.close()
+    Session.objects.all().update(flag="")
 
 
 def increment_time(user_id, seconds):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE sessions
-        SET time = time + ?
-        WHERE user_id = ?
-    """, (seconds, user_id))
-    conn.commit()
-    conn.close()
+    Session.objects.filter(user_id=user_id).update(time=models.F("time") + seconds)
 
 def get_time(user_id):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT time FROM sessions WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return row[0]
-    else:
-        # 新規挿入（必要なカラムすべて含む）
-        logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。新規挿入します。")
-        cursor.execute("INSERT INTO sessions (user_id, session_data, flag, time) VALUES (?, ?, ?, ?)",
-                       (user_id, {}, '', 0))
-        return 0
+    session = Session.objects.filter(user_id=user_id).first()
+    if session:
+        return session.time
+    logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。新規挿入します。")
+    register_user(user_id)
+    return 0
     
 def set_time(user_id, seconds):
     """
     ユーザのセッション時間を設定する
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE sessions
-        SET time = ?
-        WHERE user_id = ?
-    """, (seconds, user_id))
-    conn.commit()
-    conn.close()
+    Session.objects.filter(user_id=user_id).update(time=seconds)
     
 def reset_time(user_id):
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE sessions
-        SET time = 0
-        WHERE user_id = ?
-    """, (user_id,))
-    conn.commit()
-    conn.close()
+    Session.objects.filter(user_id=user_id).update(time=0)
 
 def init_survey(user_id):
     """
@@ -298,34 +169,17 @@ def init_survey(user_id):
     survey_data = {msg: '' for msg in SURVEY_MESSAGES}
     survey_data[SURVEY_LAST_MESSAGE] = ''
     
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-
-    # ユーザーが存在するか確認
-    cursor.execute("SELECT 1 FROM sessions WHERE user_id = ?", (user_id,))
-    exists = cursor.fetchone()
-
-    if exists:
-        # アンケートだけ更新
-        cursor.execute("UPDATE sessions SET survey = ? WHERE user_id = ?",
-                       (json.dumps(survey_data, ensure_ascii=False), user_id))
-    else:
+    updated = Session.objects.filter(user_id=user_id).update(survey=survey_data)
+    if not updated:
         logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
-
-    conn.commit()
-    conn.close()
 
 def get_survey(user_id):
     """
     ユーザのアンケートを取得する
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT survey FROM sessions WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return json.loads(row[0])
+    session = Session.objects.filter(user_id=user_id).first()
+    if session:
+        return session.survey
     else:
         logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
         return None
@@ -334,22 +188,9 @@ def save_survey(user_id, survey_data):
     """
     ユーザのアンケートを保存する
     """
-    conn = sqlite3.connect(SESSIONS_DB)
-    cursor = conn.cursor()
-
-    # ユーザーが存在するか確認
-    cursor.execute("SELECT 1 FROM sessions WHERE user_id = ?", (user_id,))
-    exists = cursor.fetchone()
-
-    if exists:
-        # アンケートだけ更新
-        cursor.execute("UPDATE sessions SET survey = ? WHERE user_id = ?",
-                       (json.dumps(survey_data, ensure_ascii=False), user_id))
-    else:
+    updated = Session.objects.filter(user_id=user_id).update(survey=survey_data)
+    if not updated:
         logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
-
-    conn.commit()
-    conn.close()
 
 
 def save_survey_results(user_id):
@@ -391,12 +232,9 @@ def save_dialogue_history_from_db(user_id):
 
     """
     
-    # LINEBOT_DBの読み込み
-    conn = sqlite3.connect(LINEBOT_DB)
-    cursor = conn.cursor()
-    cursor.execute("SELECT speaker, message, post_time, finished FROM chat_history WHERE user_id = ? ORDER BY post_time", (user_id,))
-    rows = cursor.fetchall()
-    conn.close()
+    rows = ChatHistory.objects.filter(user_id=user_id).order_by("post_time").values_list(
+        "speaker", "message", "post_time", "finished"
+    )
 
     if not rows:
         logger.error(f"user_id '{user_id}' の対話履歴が見つかりません。")

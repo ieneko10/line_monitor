@@ -3,13 +3,14 @@ import time
 import threading
 import yaml
 import stripe
-import os, sys
+import os
 import random
 import string
 from ruamel.yaml import YAML
 from typing import List, Dict, Any
 
 from linebot.v3.messaging import TextMessage
+from django.conf import settings
 
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
@@ -24,8 +25,7 @@ def load_config(file_path):
         config = yaml.load(file)
     return config
 
-config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf['LOGGER']['SYSTEM'])
 
 

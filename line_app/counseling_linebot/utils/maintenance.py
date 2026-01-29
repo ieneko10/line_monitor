@@ -1,20 +1,20 @@
-import os, sys
+import os
 import yaml
 from watchdog.events import FileSystemEventHandler
 
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
 from logger.ansi import *
-from utils import richmenu
-from utils.tool import load_config
-from utils.template_message import broadcast_message
-from utils.main_massage import timers
-from utils.db_handler import get_all_users, reset_all_flags, reset_all_sessions, set_maintenance_mode
+from django.conf import settings
+from counseling_linebot.utils import richmenu
+from counseling_linebot.utils.tool import load_config
+from counseling_linebot.utils.template_message import broadcast_message
+from counseling_linebot.utils.main_message import timers
+from counseling_linebot.utils.db_handler import get_all_users, reset_all_flags, reset_all_sessions, set_maintenance_mode
 
 
 # ロガーと設定の読み込み
-main_config_path = sys.argv[1] if len(sys.argv) > 1 else './config/main.yaml'
-conf = load_config(main_config_path)
+conf = settings.MAIN_CONFIG
 logger = start_logger(conf['LOGGER']['SYSTEM'])
 
 richmenu_ids = load_config(conf['RICHMENU_PATH'])  # リッチメニューの設定を読み込み
@@ -64,7 +64,7 @@ class FileChangeHandler(FileSystemEventHandler):
                         elif richmenu_flag == True:
                             logger.debug(f"[File Change] RICHMENU_FLAG: {richmenu_flag} == True")
 
-                            maintenace_mode_on()
+                            maintenance_mode_on()
                     
                     self.last_richmenu_flag = richmenu_flag    
                     self.last_push_flag = push_flag
@@ -75,7 +75,7 @@ class FileChangeHandler(FileSystemEventHandler):
                 pass
 
 
-def maintenace_mode_on():
+def maintenance_mode_on():
     set_maintenance_mode(True)  # メンテナンスモードをオンにする
     for timer in timers.values():
         timer.cancel()
