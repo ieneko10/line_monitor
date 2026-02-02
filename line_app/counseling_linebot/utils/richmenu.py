@@ -386,7 +386,8 @@ def create_richmenus(config):
 
 
 
-def apply_richmenu(richmenu_id, user_id):
+def apply_richmenu(richmenu_id, user_id, tabs=0):
+    indent = "\t" * tabs
 
     # ユーザーにリッチメニューを適用するAPIのURL
     apply_richmenu_url = f"https://api.line.me/v2/bot/user/{user_id}/richmenu/{richmenu_id}"
@@ -402,9 +403,9 @@ def apply_richmenu(richmenu_id, user_id):
     richmenu_name = richmenu_data.get('name', 'Unknown RichMenu')
 
     if apply_response.status_code == 200:
-        logger.debug(f"[RichMenu Applied] {richmenu_name}, user: {user_id}")
+        logger.debug(f"{indent}[RichMenu Applied] {richmenu_name}, user: {user_id}")
     else:
-        logger.error(f"[RichMenu Apply Failed] error: {apply_response.json()}\nuser: {user_id}")
+        logger.error(f"{indent}[RichMenu Apply Failed] error: {apply_response.json()}\nuser: {user_id}")
 
 
 def cancel_richmenu(user_id):
@@ -447,68 +448,70 @@ def delete_all_richmenu():
         logger.info(f'Deleted {richmenu_id}: {del_response.status_code}')
 
 
-def check_richmenu(session, postback_data, user_id, richmenu_ids):
+def check_richmenu(session, postback_data, user_id, richmenu_ids, tabs=0):
     """
     session情報をもとに、リッチメニューの適用状況が正しいかを確認する関数
     """
+    indent = "\t" * tabs
+    
     if postback_data == 'maintenance':
         if session['keyword_accepted'] == False:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["CONSENT"]}')
-            apply_richmenu(richmenu_ids['CONSENT'], user_id)
-        elif session['keword_accepted'] == True and session['counseling_mode'] == False and session['survey_mode'] == False:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["START"]}')
-            apply_richmenu(richmenu_ids['START'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["CONSENT"]}')
+            apply_richmenu(richmenu_ids['CONSENT'], user_id, tabs=tabs+1)
+        elif session['keyword_accepted'] == True and session['counseling_mode'] == False and session['survey_mode'] == False:
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["START"]}')
+            apply_richmenu(richmenu_ids['START'], user_id, tabs=tabs+1)
         elif session['counseling_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["COUNSELING"]}')
-            apply_richmenu(richmenu_ids['COUNSELING'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["COUNSELING"]}')
+            apply_richmenu(richmenu_ids['COUNSELING'], user_id, tabs=tabs+1)
         elif session['survey_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
-            apply_richmenu(richmenu_ids['SURVEY'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
+            apply_richmenu(richmenu_ids['SURVEY'], user_id, tabs=tabs+1)
         else:
             return True  # 問題ない場合はTrueを返す
 
 
     elif postback_data == 'consent' or postback_data == 'no_consent':
         if session['keyword_accepted'] == True and session['counseling_mode'] == False and session['survey_mode'] == False:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["START"]}')
-            apply_richmenu(richmenu_ids['START'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["START"]}')
+            apply_richmenu(richmenu_ids['START'], user_id, tabs=tabs+1)
         elif session['counseling_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["COUNSELING"]}')
-            apply_richmenu(richmenu_ids['COUNSELING'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["COUNSELING"]}')
+            apply_richmenu(richmenu_ids['COUNSELING'], user_id, tabs=tabs+1)
         elif session['survey_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
-            apply_richmenu(richmenu_ids['SURVEY'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
+            apply_richmenu(richmenu_ids['SURVEY'], user_id, tabs=tabs+1)
         else:
             return True  # 問題ない場合はTrueを返す
     
     elif postback_data == 'start_chat' or postback_data == 'shop':
         if session['counseling_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["COUNSELING"]}')
-            apply_richmenu(richmenu_ids['COUNSELING'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["COUNSELING"]}')
+            apply_richmenu(richmenu_ids['COUNSELING'], user_id, tabs=tabs+1)
         elif session['survey_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
-            apply_richmenu(richmenu_ids['SURVEY'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
+            apply_richmenu(richmenu_ids['SURVEY'], user_id, tabs=tabs+1)
         else:
             return True  # 問題ない場合はTrueを返す
         
     elif postback_data == 'reset_history':
         if session['survey_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
-            apply_richmenu(richmenu_ids['SURVEY'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
+            apply_richmenu(richmenu_ids['SURVEY'], user_id, tabs=tabs+1)
         else:
             return True
     
     elif postback_data == 'end_chat' or postback_data == 'check_time' or postback_data == 'back_to_menu' or postback_data == 'update_time':
         if session['survey_mode'] == True:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
-            apply_richmenu(richmenu_ids['SURVEY'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["SURVEY"]}')
+            apply_richmenu(richmenu_ids['SURVEY'], user_id, tabs=tabs+1)
         else:
             return True
 
     elif postback_data == 'end_survey':
         if session['survey_mode'] == False:
-            logger.info(f'{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["START"]}')
-            apply_richmenu(richmenu_ids['START'], user_id)
+            logger.info(f'{indent}{RD}[REAPPLY]{R} user: {user_id}, richmenu: {richmenu_ids["START"]}')
+            apply_richmenu(richmenu_ids['START'], user_id, tabs=tabs+1)
         else:
             return True
     

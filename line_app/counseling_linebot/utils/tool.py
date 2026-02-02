@@ -127,7 +127,7 @@ class TrackableTimer:
 # 辞書，リストなどのデータ構造を整形して文字列に変換する関数
 def format_structure(data, indent=0):
     lines = []
-    prefix = '  ' * indent
+    prefix = '\t' * indent
 
     if isinstance(data, dict):
         for key, value in data.items():

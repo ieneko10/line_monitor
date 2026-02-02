@@ -45,3 +45,8 @@ COLOR_CONFIG:   # その色にしたい文字列を正規表現で指定
   WRITE:
     G:
       - '\[.*?\]'
+
+  MG:
+    - 
+      pattern: 'user:\s*(U[0-9a-f]+)'
+      group: 1

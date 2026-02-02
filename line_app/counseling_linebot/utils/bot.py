@@ -1,6 +1,5 @@
 import re
 import random
-import datetime
 from typing import List, Dict, Tuple, Any, Optional
 
 from openai import OpenAI
@@ -12,6 +11,7 @@ import re
 from logger.set_logger import start_logger
 from logger.ansi import *
 from django.conf import settings
+from django.utils import timezone
 from counseling_linebot.models import ChatHistory
 from counseling_linebot.utils.tool import format_history
 from counseling_linebot.utils.db_handler import save_dialogue_history, get_session
@@ -190,7 +190,7 @@ class CounselorBot:
         session = get_session(user_id)
         session_id = session.get('session_id', '')
         try:
-            post_time = datetime.datetime.now()
+            post_time = timezone.now()
             ChatHistory.objects.create(
                 user_id=user_id,
                 speaker="user",
@@ -201,7 +201,7 @@ class CounselorBot:
             )
             save_dialogue_history(user_id, "user", "[START]", session_id, post_time)  # Save to file
 
-            post_time = datetime.datetime.now()
+            post_time = timezone.now()
             ChatHistory.objects.create(
                 user_id=user_id,
                 speaker="assistant",
@@ -293,7 +293,7 @@ class CounselorBot:
         logger.info(f"[Finishing Dialogue] user: {user_id}")
         session_id = get_session(user_id).get('session_id', '')
         try:
-            post_time = datetime.datetime.now()
+            post_time = timezone.now()
             ChatHistory.objects.create(
                 user_id=user_id,
                 speaker="user",
@@ -313,7 +313,7 @@ class CounselorBot:
         logger.info(f"[Receive Message] user: {user_id}\n  message: {repr(message)}")
         session_id = get_session(user_id).get('session_id', '')
         try:
-            post_time = datetime.datetime.now()
+            post_time = timezone.now()
             ChatHistory.objects.create(
                 user_id=user_id,
                 speaker="user",
@@ -327,7 +327,7 @@ class CounselorBot:
             history = self._get_history(user_id, context_num)
             response, is_finished = self._generate_response(history, user_id=user_id)
 
-            post_time = datetime.datetime.now()
+            post_time = timezone.now()
             ChatHistory.objects.create(
                 user_id=user_id,
                 speaker="assistant",

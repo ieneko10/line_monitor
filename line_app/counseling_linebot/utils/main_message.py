@@ -162,8 +162,8 @@ def start_chat(event, reset=False):
                 model_name=model_name,
                 model_type=MODEL_TYPE,
                 google_api_key=google_api_key,
-                system_prompt_path="prompt/system_prompt.txt", 
-                example_files=["prompt/case1_0.txt", "prompt/case2_0.txt", "prompt/case3_0.txt", "prompt/case4_0.txt", "prompt/case5_0.txt", "prompt/case6_1.txt"]
+                system_prompt_path="./counseling_linebot/prompts/system_prompt.txt", 
+                example_files=["./counseling_linebot/prompts/case1_0.txt", "./counseling_linebot/prompts/case2_0.txt", "./counseling_linebot/prompts/case3_0.txt", "./counseling_linebot/prompts/case4_0.txt", "./counseling_linebot/prompts/case5_0.txt", "./counseling_linebot/prompts/case6_1.txt"]
                 )
     
     init_message = bot.start_message(user_id)
@@ -216,8 +216,13 @@ def reply(event, tunnel):
                 model_name=model_name,
                 model_type=MODEL_TYPE,
                 google_api_key=google_api_key,
-                system_prompt_path="prompt/system_prompt.txt", 
-                example_files=["prompt/case1_0.txt", "prompt/case2_0.txt", "prompt/case3_0.txt", "prompt/case4_0.txt", "prompt/case5_0.txt", "prompt/case6_1.txt"]
+                system_prompt_path="./counseling_linebot/prompts/system_prompt.txt", 
+                example_files=["./counseling_linebot/prompts/case1_0.txt", 
+                               "./counseling_linebot/prompts/case2_0.txt", 
+                               "./counseling_linebot/prompts/case3_0.txt", 
+                               "./counseling_linebot/prompts/case4_0.txt", 
+                               "./counseling_linebot/prompts/case5_0.txt", 
+                               "./counseling_linebot/prompts/case6_1.txt"]
                 )
     response, is_finished = bot.reply(user_id, uttr, remove_thought=True)
     

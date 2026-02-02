@@ -5,8 +5,8 @@ LOGGER:
 
 
 # PORT
-PORT: 8443
-NGROK: false  # trueにすると，ngrokを使って外部からアクセス可能にする
+PORT: 8080
+NGROK: true  # trueにすると，ngrokを使って外部からアクセス可能にする
 SERVER_URL: "https://mil-ai.net"  # NGROKを使わない場合は，ここにサーバのURLを指定する
 
 # SERVER MAINTENANCE

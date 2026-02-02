@@ -1,10 +1,10 @@
 import json
-import datetime
 
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
 from logger.ansi import *
 from django.conf import settings
+from django.utils import timezone
 from django.db import models
 from counseling_linebot.models import Session, Setting, ChatHistory
 
@@ -19,41 +19,21 @@ LANGUAGE = conf["LANGUAGE"]
 SESSIONS_DB = conf["SESSIONS_DB"]
 LINEBOT_DB = conf["LINEBOT_DB"]
 
-def init_db():
-    """
-    user_id: ユーザのLINE ID
-    session_data: {
-                   "counseling_mode": bool,    #カウンセリングモードかどうか
-                   "keyword_accepted": bool,   #ユーザから同意を得たかどうか 
-                   "survey_mode": bool,        #アンケートモードかどうか
-                   "survey_progress": int,     #アンケートの進行度
-                   "finished": bool,           #カウンセリングが終了しているかどうか
-                   "session_id": str,          #セッションID（ランダムな文字列）
-                   }
-    # ユーザのLINE上のボタンの状態を管理する文字列．ユーザはボタン以外の動作（リッチメニュー操作や任意のテキスト送信）が可能なので，それらを無効にする
-    flag: str: 'accepted', 'start_chat', 'reset_history'
-    time: セッションの時間（秒）
-    survey: dict[question]: アンケートの回答
-    """
-    logger.info("[Initializing Database]")
-    # Django ORMを利用するため、ここではテーブル作成を行わない
-    return
 
-def init_settings_table():
-    logger.info("[Initializing Settings Table]")
-    return
-
-def set_maintenance_mode(enabled: bool):
-    logger.info(f"[Setting Maintenance Mode] {enabled}")
+def set_maintenance_mode(enabled: bool, tabs=0):
+    indent = "\t" * tabs
+    logger.info(f"{indent}[Setting Maintenance Mode] {enabled}")
     Setting.objects.update_or_create(
         key="maintenance",
         defaults={"value": str(int(enabled))},
     )
 
-def get_maintenance_mode() -> bool:
+def get_maintenance_mode(tabs=0) -> bool:
     setting = Setting.objects.filter(key="maintenance").first()
     value = bool(int(setting.value)) if setting else False
-    logger.debug(f"[Getting Maintenance Mode] {value}")
+    
+    indent = "\t" * tabs
+    logger.debug(f"{indent}[Getting Maintenance Mode] {value}")
     return value
 
 
@@ -76,7 +56,7 @@ def register_user(user_id):
         },
     )
 
-def get_all_users():
+def get_all_users(tabs=0):
     """
     全ユーザのuser_idを取得する
     """
@@ -84,21 +64,24 @@ def get_all_users():
     if users:
         return users
     else:
-        logger.warning("[Not Found] sessions テーブルにユーザが存在しません。")
+        indent = "\t" * tabs
+        logger.warning(f"{indent}[Not Found] sessions テーブルにユーザが存在しません。")
         return []
 
-def get_session(user_id):
+def get_session(user_id, tabs=0):
     session = Session.objects.filter(user_id=user_id).first()
     if session is not None:
         return session.session_data
     else:
-        logger.error(f"[Not Found] user_id '{user_id}' のセッションが見つかりません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}[Not Found] user_id '{user_id}' のセッションが見つかりません。")
         return None
 
-def save_session(user_id, data):
+def save_session(user_id, data, tabs=0):
     updated = Session.objects.filter(user_id=user_id).update(session_data=data)
     if not updated:
-        logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。")
     
 
 def reset_all_sessions():
@@ -121,13 +104,14 @@ def delete_session(user_id):
 def get_flag(user_id):
     return Session.objects.filter(user_id=user_id).values_list("flag", flat=True).first()
 
-def save_flag(user_id, flag):
+def save_flag(user_id, flag, tabs=0):
     """
     ユーザのフラグを保存する
     """
     updated = Session.objects.filter(user_id=user_id).update(flag=flag)
     if not updated:
-        logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。")
 
 def reset_flag(user_id):
     """
@@ -145,15 +129,16 @@ def reset_all_flags():
 def increment_time(user_id, seconds):
     Session.objects.filter(user_id=user_id).update(time=models.F("time") + seconds)
 
-def get_time(user_id):
+def get_time(user_id, tabs=0):
     session = Session.objects.filter(user_id=user_id).first()
     if session:
         return session.time
-    logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。新規挿入します。")
+    indent = "\t" * tabs
+    logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。新規挿入します。")
     register_user(user_id)
     return 0
     
-def set_time(user_id, seconds):
+def set_time(user_id, seconds, tabs=0):
     """
     ユーザのセッション時間を設定する
     """
@@ -162,7 +147,7 @@ def set_time(user_id, seconds):
 def reset_time(user_id):
     Session.objects.filter(user_id=user_id).update(time=0)
 
-def init_survey(user_id):
+def init_survey(user_id, tabs=0):
     """
     ユーザのアンケートを初期化する
     """
@@ -171,9 +156,10 @@ def init_survey(user_id):
     
     updated = Session.objects.filter(user_id=user_id).update(survey=survey_data)
     if not updated:
-        logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。")
 
-def get_survey(user_id):
+def get_survey(user_id, tabs=0):
     """
     ユーザのアンケートを取得する
     """
@@ -181,16 +167,18 @@ def get_survey(user_id):
     if session:
         return session.survey
     else:
-        logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。")
         return None
 
-def save_survey(user_id, survey_data):
+def save_survey(user_id, survey_data, tabs=0):
     """
     ユーザのアンケートを保存する
     """
     updated = Session.objects.filter(user_id=user_id).update(survey=survey_data)
     if not updated:
-        logger.error(f"user_id '{user_id}' が sessions テーブルに存在しません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。")
 
 
 def save_survey_results(user_id):
@@ -202,7 +190,7 @@ def save_survey_results(user_id):
     session_id = session.get('session_id', '')
     with open(f"survey/trial_{LANGUAGE}_{user_id}.txt", "a", encoding='utf-8') as w:
         # 日時を書き込み
-        w.write(f"[{datetime.datetime.now()}] Session ID: {session_id}\n")
+        w.write(f"[{timezone.now()}] Session ID: {session_id}\n")
         for i in range(len(SURVEY_MESSAGES)):
             survey_message = SURVEY_MESSAGES[i]
             # survey_messageを\n\nで分割
@@ -216,7 +204,7 @@ def save_survey_results(user_id):
         w.write(f"{SURVEY_LAST_MESSAGE}\t{survey_results[SURVEY_LAST_MESSAGE]}\n\n")
 
 
-def save_dialogue_history_from_db(user_id):
+def save_dialogue_history_from_db(user_id, tabs=0):
     """
     ユーザの対話履歴をファイルに保存する
     
@@ -237,7 +225,8 @@ def save_dialogue_history_from_db(user_id):
     )
 
     if not rows:
-        logger.error(f"user_id '{user_id}' の対話履歴が見つかりません。")
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' の対話履歴が見つかりません。")
         return
 
     with open(f"dialogue/{user_id}.txt", "a", encoding='utf-8') as w:
