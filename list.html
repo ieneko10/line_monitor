@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}対話履歴一覧 - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.topic-button {
+    padding: 0em 0em;
+    cursor: pointer;
+    color: #0066cc;
+    background-color: #ffffff;
+    border: 0px solid #0066cc;
+    border-radius: 4px;
+    transition: color 0s, text-decoration 0.2s;
+    text-decoration: none;
+}
+.topic-button:hover {
+    color: #003d7a;
+    background-color: #ffffff;
+    text-decoration: underline;
+}
+.sort-link {
+    margin-left: 5px;
+    font-size: 0.9em;
+    text-decoration: none;
+    color: #666;
+    cursor: pointer;
+}
+.sort-link:hover {
+    color: #000;
+}
+.sort-link.active {
+    color: #0066cc;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+  <h2>対話履歴一覧</h2>
+
+  <!-- 追加: チャートと平均値（ページ上部に表示） -->
+  {% if score_chart_available %}
+    <div style="margin: 1em 0; padding: 0.8em; border: 1px solid #e0e0e0; border-radius:6px; background:#fafafa;">
+      <!-- 変更: 横並びから縦並びに -->
+      <div style="display:flex; flex-direction:column; gap:0.6em; align-items:flex-start; flex-wrap:wrap;">
+        <div>
+          <strong>全体平均スコア:</strong> {% if score_avg_overall is not None %}{{ score_avg_overall }}{% else %}-{% endif %}
+        </div>
+        <div>
+          <strong>直近30件平均:</strong> {% if score_avg_30 is not None %}{{ score_avg_30 }}{% else %}-{% endif %}
+        </div>
+        <div>
+          <strong>直近10件平均:</strong> {% if score_avg_10 is not None %}{{ score_avg_10 }}{% else %}-{% endif %}
+        </div>
+      </div>
+
+      <div style="margin-top:0.8em; position: relative; height:250px; max-width:100%;">
+        <canvas id="scoreChart"></canvas>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+      (function(){
+        const labels = {{ score_chart_labels_json|safe }};
+        const data = {{ score_chart_data_json|safe }};
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '評価スコア',
+              data: data,
+              borderColor: 'rgba(54, 162, 235, 1)',
+              backgroundColor: 'rgba(54, 162, 235, 0.15)',
+              fill: true,
+              tension: 0.25,
+              pointRadius: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: {
+                  display: false  // 追加: 横軸ラベルを非表示にする
+                }
+              },
+              y: {
+                beginAtZero: true,
+                suggestedMax: 100
+              }
+            },
+            plugins: {
+              legend: { display: false }
+            }
+          }
+        });
+      })();
+    </script>
+  {% endif %}
+
+  <!-- 絞り込み機能 -->
+  <div style="margin-bottom: 1em; padding: 1em; border: 1px solid #ccc; border-radius: 4px;">
+    <form method="get" id="filter-form">
+      <div style="display: flex; gap: 1em; align-items: center; flex-wrap: wrap;">
+        <span style="font-weight: bold;">絞り込み:</span>
+        <div style="display: flex; gap: 1em;">
+          <label>
+            <input type="checkbox" name="status" value="active" {% if 'active' in current_status_filters %}checked{% endif %}> 進行中
+          </label>
+          <label>
+            <input type="checkbox" name="status" value="completed" {% if 'completed' in current_status_filters %}checked{% endif %}> 未評価
+          </label>
+          <label>
+            <input type="checkbox" name="status" value="evaluated" {% if 'evaluated' in current_status_filters %}checked{% endif %}> 評価済み
+          </label>
+        </div>
+        <div>
+          <button type="submit" style="padding: 0.5em 1.5em;">適用</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if sessions %}
+    <table>
+      <thead>
+        <tr>
+          <th>トピック（クリックして対話を再開）</th>
+          <th>
+            開始日時
+            <a href="?{% for status in current_status_filters %}status={{ status }}&{% endfor %}sort=start_time&order=asc" class="sort-link {% if current_sort == 'start_time' and current_order == 'asc' %}active{% endif %}">↑</a>
+            <a href="?{% for status in current_status_filters %}status={{ status }}&{% endfor %}sort=start_time&order=desc" class="sort-link {% if current_sort == 'start_time' and current_order == 'desc' %}active{% endif %}">↓</a>
+          </th>
+          <th>
+            更新日時
+            <a href="?{% for status in current_status_filters %}status={{ status }}&{% endfor %}sort=updated_at&order=asc" class="sort-link {% if current_sort == 'updated_at' and current_order == 'asc' %}active{% endif %}">↑</a>
+            <a href="?{% for status in current_status_filters %}status={{ status }}&{% endfor %}sort=updated_at&order=desc" class="sort-link {% if current_sort == 'updated_at' and current_order == 'desc' %}active{% endif %}">↓</a>
+          </th>
+          <th>ステータス</th>
+          <th>
+            評価スコア
+            <a href="?{% for status in current_status_filters %}status={{ status }}&{% endfor %}sort=score&order=asc" class="sort-link {% if current_sort == 'score' and current_order == 'asc' %}active{% endif %}">↑</a>
+            <a href="?{% for status in current_status_filters %}status={{ status }}&{% endfor %}sort=score&order=desc" class="sort-link {% if current_sort == 'score' and current_order == 'desc' %}active{% endif %}">↓</a>
+          </th>
+          <th>詳細</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for session_item in sessions %}
+          <tr>
+            <td>
+              {% if session_item.status == 'active' or session_item.status == 'completed' %}
+                <a href="{% url 'dialogues:dialogue_chat' session_id=session_item.id %}" style="text-decoration: none;">
+                  <button type="button" class="topic-button">
+                    {% if session_item.illegal_job_topic %}{{ session_item.illegal_job_topic.name }}{% elif session_item.topic %}{{ session_item.topic.name }}{% else %}-{% endif %}
+                  </button>
+                </a>
+              {% else %}
+                {% if session_item.illegal_job_topic %}{{ session_item.illegal_job_topic.name }}{% elif session_item.topic %}{{ session_item.topic.name }}{% else %}-{% endif %}
+              {% endif %}
+            </td>
+            <td>{{ session_item.start_time|date:"Y/m/d H:i" }}</td>
+            <td>
+              {% if session_item.updated_at %}
+                {{ session_item.updated_at|date:"Y/m/d H:i" }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>{{ session_item.get_status_display }}</td>
+            <td>
+              {% if session_item.evaluationresult and session_item.evaluationresult.calculated_overall_score is not None %}
+                {{ session_item.evaluationresult.calculated_overall_score }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td><a href="{% url 'dialogues:dialogue_history_detail' session_id=session_item.id %}">詳細を見る</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {# ページネーション #}
+    {% if is_paginated %}
+      <div class="pagination">
+        <span class="step-links">
+          {% if page_obj.has_previous %}
+            <a href="?{{ request.GET.urlencode }}&page=1">&laquo; 最初</a>
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}">前へ</a>
+          {% endif %}
+
+          <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+          </span>
+
+          {% if page_obj.has_next %}
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}">次へ</a>
+            <a href="?{{ request.GET.urlencode }}&page={{ page_obj.paginator.num_pages }}">最後 &raquo;</a>
+          {% endif %}
+        </span>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <p>まだ対話履歴がありません。</p>
+  {% endif %}
+  
+  <p style="margin-top: 1em;">
+    {% if USAGE_DATABASE == 'illegal_job' %}
+      <a href="{% url 'dialogues:start_illegal_job' %}">新しい対話練習を始める</a>
+    {% else %}
+      <a href="{% url 'dialogues:category_list' %}">新しい対話練習を始める</a>
+    {% endif %}
+  </p>
+  <p><a href="{% url 'home' %}">ホームに戻る</a></p>
+
+  <script>
+    // 絞り込みボタンのトグル機能を削除（チェックボックスが常に表示されるため不要）
+  </script>
+{% endblock %}

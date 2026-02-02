@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}ログイン - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .login-card {
+        max-width: 420px;
+        margin: 0 auto;
+        padding: 24px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background: #fafafa;
+    }
+    .login-card h2 {
+        margin-top: 0;
+        margin-bottom: 16px;
+        font-size: 1.6em;
+    }
+    .login-card label {
+        display: block;
+        margin: 12px 0 6px;
+        font-weight: bold;
+    }
+    .login-card button {
+        width: 100%;
+        margin-top: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="login-card">
+        <h2>ログイン</h2>
+        <form method="post">
+            {% csrf_token %}
+            <label for="username">ユーザー名</label>
+            <input type="text" id="username" name="username" required>
+
+            <label for="password">パスワード</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="submit">ログイン</button>
+        </form>
+    </div>
+{% endblock %}

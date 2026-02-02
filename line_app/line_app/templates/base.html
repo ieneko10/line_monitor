@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}カウンセリング監視システム{% endblock %}</title>
+    <style>
+        /* Universal box-sizing for consistent layout */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; overscroll-behavior-x: none; }
+        header { background-color: rgb(55, 75, 78); color: #fff; padding: 0.5em 0; text-align: center; position: relative; }
+        header h1 { margin: 0; font-size: 1.5em; }
+        .header-logo { max-height: 60px; width: auto; vertical-align: middle; }
+        nav { background-color: rgb(76, 104, 108); }
+        .nav-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        nav a { color: #fff; margin: 0 1em; text-decoration: none; padding: 1em 0; display: inline-block; }
+        nav a:hover { text-decoration: underline; }
+        nav .separator { display: inline; }
+        #logout-form { display: inline; }
+        #logout-form button { background:none; border:none; padding:0; color:white; text-decoration:underline; cursor:pointer; font-size: 1em; font-family: sans-serif; vertical-align: baseline;}
+
+        .container { width: 80%; margin: 2em auto; padding: 2em; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        footer { text-align: center; padding: 1em 0; margin-top: 2em; background-color: rgb(55, 75, 78); color: #fff; font-size: 0.9em; }
+        .messages { list-style: none; padding: 0; margin: 1em 0; }
+        .messages li { padding: 0.8em; margin-bottom: 0.5em; border-radius: 4px; }
+        .messages li.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .messages li.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .messages li.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .messages li.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        button, input[type="submit"] {
+            background-color: rgb(76, 104, 108);
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover, input[type="submit"]:hover {
+            background-color: rgb(55, 75, 78);
+        }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1em;}
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        input[type="text"], input[type="password"], input[type="email"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .button-like {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: rgb(76, 104, 108);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .button-like:hover {
+            background-color: rgb(55, 75, 78);
+        }
+
+        .nav-toggle {
+            display: none;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                margin: 1em auto;
+                padding: 1em;
+            }
+            .nav-toggle {
+                display: block;
+                position: absolute;
+                right: 1em;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                cursor: pointer;
+                padding: 0;
+                z-index: 1000;
+            }
+            .hamburger {
+                display: block;
+                width: 25px;
+                height: 3px;
+                background: white;
+                position: relative;
+            }
+            .hamburger::before, .hamburger::after {
+                content: '';
+                position: absolute;
+                width: 25px;
+                height: 3px;
+                background: white;
+            }
+            .hamburger::before { top: -8px; }
+            .hamburger::after { bottom: -8px; }
+
+            .nav-container {
+                display: none;
+                flex-direction: column;
+                width: 100%;
+            }
+            .nav-container.active {
+                display: flex;
+            }
+            nav a, #logout-form {
+                display: block;
+                width: 100%;
+                text-align: center;
+                margin: 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            #logout-form button {
+                width: 100%;
+                padding: 1em 0;
+                text-decoration: none;
+            }
+            nav .separator {
+                display: none;
+            }
+            header h1 {
+                font-size: 1.2em;
+            }
+            .header-logo {
+                max-height: 45px;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <a href="/" style="text-decoration: none;">
+            <h1 style="color: white;">カウンセリングセッション監視システム</h1>
+        </a>
+        <button class="nav-toggle" aria-label="toggle navigation">
+            <span class="hamburger"></span>
+        </button>
+    </header>
+
+    <nav>
+        <div class="nav-container">
+            <a href="/monitor/">監視</a>
+            {% if user.is_authenticated %}
+                <form id="logout-form" method="post" action="/logout/">
+                    {% csrf_token %}
+                    <button type="submit">ログアウト</button>
+                </form>
+            {% else %}
+                <a href="/login/">ログイン</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <footer>
+        <p>&copy; {% now "Y" %} Rapport Technologies, Inc. All rights reserved.</p>
+    </footer>
+
+    {% block body_bottom_elements %}{% endblock %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const navToggle = document.querySelector('.nav-toggle');
+            const navContainer = document.querySelector('.nav-container');
+
+            if (navToggle && navContainer) {
+                navToggle.addEventListener('click', function () {
+                    navContainer.classList.toggle('active');
+                });
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

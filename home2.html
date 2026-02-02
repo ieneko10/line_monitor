@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load static %} {# 静的ファイルを使う場合に備えて #}
+
+{% block title %}ようこそ - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .hero-section {
+        text-align: center;
+        padding: 40px 20px;
+        background-color: #f8f9fa; /* 明るい背景色 */
+        border-bottom: 1px solid #e7e7e7;
+    }
+    .hero-section h1 {
+        font-size: 2.5em;
+        margin-bottom: 20px;
+        color: #333;
+    }
+    .hero-section p.lead {
+        font-size: 1.2em;
+        color: #555;
+        margin-bottom: 30px;
+        max-width: 700px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .cta-buttons a {
+        display: inline-block;
+        margin: 5px 10px;
+        padding: 12px 25px;
+        font-size: 1.1em;
+        text-decoration: none;
+        border-radius: 5px;
+    }
+    .cta-buttons .btn-primary {
+        background-color: #007bff; /* プライマリボタンの色 */
+        color: white;
+        border: 1px solid #007bff;
+    }
+    .cta-buttons .btn-primary:hover {
+        background-color: #0056b3;
+    }
+    .cta-buttons .btn-secondary {
+        background-color: #6c757d; /* セカンダリボタンの色 */
+        color: white;
+        border: 1px solid #6c757d;
+    }
+    .cta-buttons .btn-secondary:hover {
+        background-color: #545b62;
+    }
+
+    .features-section {
+        padding: 40px 20px;
+        text-align: center;
+    }
+    .features-section h2 {
+        font-size: 2.2em;
+        margin-bottom: 40px;
+    }
+    .features-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        gap: 20px;
+    }
+    .feature {
+        flex-basis: 30%;
+        min-width: 280px; /* 最小幅を指定 */
+        margin-bottom: 20px;
+    }
+    .feature h3 {
+        font-size: 1.5em;
+        color: #007bff;
+    }
+    .feature p {
+        color: #555;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+        .hero-section h1 {
+            font-size: 2em;
+        }
+        .hero-section p.lead {
+            font-size: 1.1em;
+        }
+        .features-container {
+            flex-direction: column;
+            align-items: center;
+        }
+        .feature {
+            flex-basis: 100%; /* 縦に並べる */
+            max-width: 400px; /* 最大幅を制限 */
+        }
+        .cta-buttons a {
+            display: block;
+            margin: 10px auto;
+            width: 80%;
+            max-width: 300px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="hero-section">
+        {% if user.is_authenticated %}
+            <h1>ようこそ、{{ user.username }}さん!</h1>
+            <p class="lead">シンカと練習して、あなたのスキルを磨きましょう。</p>
+            <div class="cta-buttons">
+                {% if USAGE_DATABASE == 'illegal_job' %}
+                    <a href="{% url 'dialogues:start_illegal_job' %}" class="btn-primary">練習を始める</a>
+                {% else %}
+                    <a href="{% url 'dialogues:category_list' %}" class="btn-primary">練習を始める</a>
+                {% endif %}
+                <a href="{% url 'dialogues:dialogue_history_list' %}" class="btn-secondary">対話の再開/履歴</a>
+                {% if USE_SUBSCRIPTION %}
+                    <a href="{% url 'subscriptions:plans' %}" class="btn-secondary">サブスクリプション管理</a>
+                {% endif %}
+                <a href="{% url 'subscriptions:usage_status' %}" class="btn-secondary">API使用状況</a>
+                <a href="{% url 'accounts:email_settings' %}" class="btn-secondary">メールアドレス設定</a>
+            </div>
+    {% else %}
+      <h1>AI相談者と実践的なカウンセリング練習を</h1>
+      <p class="lead">様々な悩みを抱えるAI相談者との対話を通じて、あなたのSNSカウンセリングスキルを向上させませんか？<br>対話後には詳細なフィードバックも得られます。</p>
+      <div class="cta-buttons">
+        <a href="{% url 'accounts:signup' %}" class="btn-primary">新規登録して始める</a>
+        <a href="{% url 'accounts:login' %}" class="btn-secondary">ログイン</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="features-section">
+    <h2>システムの特長</h2>
+    <div class="features-container">
+        <div class="feature">
+            <h3>リアルなAI相談者</h3>
+            <p>多様な悩みや性格を持つAIが、あなたの練習相手となります。実際の相談に近い状況でスキルを試せます。</p>
+        </div>
+        <div class="feature">
+            <h3>詳細なフィードバック</h3>
+            <p>対話終了後、20項目の評価基準に基づいた具体的なフィードバックとスコアで、あなたの強みと改善点を把握できます。</p>
+        </div>
+        <div class="feature">
+            <h3>いつでもどこでも</h3>
+            <p>時間や場所を選ばずに、自分のペースで繰り返し練習可能。着実にスキルアップを目指せます。</p>
+        </div>
+    </div>
+  </div>
+{% endblock %}
