@@ -1,0 +1,802 @@
+{% extends "base.html" %}
+
+{% block title %}対話練習：{{ topic.name }} - {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.chat-container {
+    display: flex;
+    gap: 20px;
+}
+.chat-main {
+    flex-grow: 1;
+    min-width: 0; /* flexアイテムのオーバーフローを防ぐ */
+}
+.chat-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    border-left: 1px solid #ccc;
+    padding-left: 20px;
+}
+#chat-log {
+    max-height: 400px; /* 固定高さから最大高さへ変更 */
+    height: 60vh; /* 画面の高さに対する割合で高さを設定 */
+    border: 1px solid #ccc;
+    overflow-y: scroll;
+    padding: 10px;
+    margin-bottom: 10px;
+    overflow-wrap: break-word;
+}
+#chat-form .form-row {
+    display: flex;
+    align-items: stretch; /* 高さを揃えるためにstretchに変更 */
+    gap: 5px;
+}
+#user-message-input {
+    flex-grow: 1;
+    resize: vertical;
+    font-size: 16px; /* モバイルでの自動ズーム防止 */
+}
+#submit-chat-button {
+    flex-shrink: 0;
+}
+.dialogue-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2em;
+    flex-wrap: wrap; /* 画面が小さい場合に折り返す */
+    gap: 1em;
+}
+
+/* 簡単なCSSスピナー */
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 4px solid #fff;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-left: auto;
+    margin-right: auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 戦略表示エリア */
+#strategy-area {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    min-height: 100px;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+.strategy-placeholder {
+    color: #888;
+    font-style: italic;
+    font-size: 0.95em;
+}
+#strategy-area ul {
+    list-style-type: none;
+    padding-left: 0;
+    width: 100%;
+    text-align: left;
+}
+#strategy-area ul li {
+    margin-bottom: 15px;
+    border: 1px solid #eee;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: #fff;
+}
+#strategy-area ul li h5 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    font-size: 1.1em;
+    color: #337ab7;
+}
+#strategy-area ul li p {
+    white-space: pre-wrap;
+    margin: 0;
+    font-size: 0.95em;
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+.evaluation-box {
+    background: #e3f2fd;
+    border-left: 4px solid #2196F3;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+/* スコア0: 赤系 */
+.evaluation-box.score-0 {
+    background: #ffebee;
+    border-left-color: #f44336;
+}
+.evaluation-box.score-0 .score {
+    color: #c62828;
+}
+.evaluation-box.score-0 .score:hover {
+    color: #b71c1c;
+}
+.evaluation-box.score-0 .reason {
+    border-top-color: #ef9a9a;
+}
+/* スコア1: 黄色/オレンジ系 */
+.evaluation-box.score-1 {
+    background: #fff3e0;
+    border-left-color: #ff9800;
+}
+.evaluation-box.score-1 .score {
+    color: #ef6c00;
+}
+.evaluation-box.score-1 .score:hover {
+    color: #e65100;
+}
+.evaluation-box.score-1 .reason {
+    border-top-color: #ffcc80;
+}
+/* スコア2: 緑系 */
+.evaluation-box.score-2 {
+    background: #e8f5e9;
+    border-left-color: #4caf50;
+}
+.evaluation-box.score-2 .score {
+    color: #2e7d32;
+}
+.evaluation-box.score-2 .score:hover {
+    color: #1b5e20;
+}
+.evaluation-box.score-2 .reason {
+    border-top-color: #a5d6a7;
+}
+.evaluation-box .score {
+    font-weight: bold;
+    color: #1976D2;
+    font-size: 1.1em;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.evaluation-box .score:hover {
+    color: #0d47a1;
+}
+.evaluation-box .score::after {
+    content: '▼';
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+.evaluation-box .score.collapsed::after {
+    transform: rotate(-90deg);
+}
+.evaluation-box .reason {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #90caf9;
+    color: #333;
+    max-height: 500px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    opacity: 1;
+}
+.evaluation-box .reason.hidden {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .chat-container {
+        flex-direction: column;
+    }
+    .chat-sidebar {
+        width: 100%;
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px solid #ccc;
+        padding-top: 20px;
+        margin-top: 20px;
+    }
+    .dialogue-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    #chat-log {
+        height: 50vh; /* スマートフォンでは高さを調整 */
+    }
+}
+
+/* 音声チャットボタンのスタイル */
+.voice-chat-button {
+    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+    color: white !important;
+    padding: 12px 20px !important;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.1em;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+    transition: all 0.3s ease;
+    border: 2px solid #ff6b35;
+}
+
+.voice-chat-button:hover {
+    background: linear-gradient(135deg, #f7931e 0%, #ff6b35 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 53, 0.6);
+}
+
+.voice-chat-button .emoji {
+    font-size: 1.3em;
+    animation: pulse-icon 2s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="chat-container">
+    <div class="chat-main">
+
+            <div id="chat-log">
+        {% if dialogue_logs %}
+          {% for log_entry in dialogue_logs %}
+            <p style="overflow-wrap: break-word; word-break: break-word;">
+              <strong>
+                {% if log_entry.speaker == 'user' %}あなた (カウンセラー){% else %}相談者 (AI){% endif %}:
+              </strong>
+{{ log_entry.message|linebreaksbr }}
+              <span style="font-size: 0.8em; color: #777;">
+                ({{ log_entry.timestamp|date:"H:i:s" }})
+              </span>
+            </p>
+          {% endfor %}
+        {% elif is_new_session %}
+            <p style="overflow-wrap: break-word; word-break: break-word;">
+              <strong>相談者 (AI):</strong>
+              こんにちは。今日はよろしくお願いします。
+            </p>
+        {% else %}
+            <p id="no-dialogue-message">まだ対話がありません。</p>
+        {% endif %}
+      </div>
+
+      <form id="chat-form" method="post" action="{% if is_new_session %}{% if is_illegal_job %}{% url 'dialogues:dialogue_chat_new_illegal' illegal_topic_id=topic.id %}{% else %}{% url 'dialogues:dialogue_chat_new' topic_id=topic.id %}{% endif %}{% else %}{% url 'dialogues:dialogue_chat' session_id=session.id %}{% endif %}">
+        {% csrf_token %}
+        <div class="form-row">
+          <textarea name="message" id="user-message-input" rows="3" placeholder="カウンセラーとしての応答を入力..." required></textarea>
+          <button type="submit" id="submit-chat-button" class="button">送信<br><span style="font-size:0.8em; color:#ffffff;">(Ctrl+Enter)</span></button>
+        </div>
+      </form>
+    </div>
+
+    <div id="sidebar-strategy" class="chat-sidebar">
+        <h3>戦略と応答例</h3>
+        <button id="generate-strategy-btn">応答例を生成する</button>
+        <div id="strategy-area">
+            <p class="strategy-placeholder">ここに戦略・応答例が表示されます。</p>
+        </div>
+    </div>
+  </div>
+
+  <hr style="margin-top:2em;">
+
+  <div class="dialogue-actions">
+    <div style="display: flex; gap: 10px; align-items: center;">
+      {% if not is_new_session and session %}
+      <form id="end-dialogue-form" method="post" action="{% url 'dialogues:end_dialogue' session_id=session.id %}" style="margin: 0;">
+        {% csrf_token %}
+        <button type="submit" id="end-dialogue-button"
+          {% if not has_user_message %}disabled style="background-color: #ccc; color: #666; cursor: not-allowed;" onclick="return false;"{% else %}onclick="return confirm('対話を終了しますか？');"{% endif %}
+        >対話を終了して評価を見る</button>
+      </form>
+      <form id="reset-dialogue-form" method="post" action="{% url 'dialogues:reset_dialogue' session_id=session.id %}" style="margin: 0;">
+        {% csrf_token %}
+        <button type="submit" id="reset-dialogue-button"
+          {% if not has_user_message %}disabled style="background-color: #ccc; color: #666; cursor: not-allowed;" onclick="return false;"{% else %}onclick="return confirm('本当に対話履歴をリセットしますか？');"{% endif %}
+        >対話履歴をリセット</button>
+      </form>
+      {% else %}
+      <!-- 新規セッションの場合: ボタンのみ配置し、フォームは後でJSで生成 -->
+      <div id="button-container">
+        <button type="button" id="end-dialogue-button" disabled style="background-color: #ccc; color: #666; cursor: not-allowed;">対話を終了して評価を見る</button>
+        <button type="button" id="reset-dialogue-button" disabled style="background-color: #ccc; color: #666; cursor: not-allowed;">対話履歴をリセット</button>
+      </div>
+      {% endif %}
+    </div>
+    {% if VOICE_CHAT_ENABLED %}
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      {% if session %}
+        <p><a href="{% url 'dialogues:voice_chat' %}?session_id={{ session.id }}" class="voice-chat-button"><span class="emoji">🎤</span> 音声チャット(β版)</a></p>
+      {% else %}
+        {% if is_illegal_job %}
+        <p><a href="{% url 'dialogues:voice_chat' %}?is_illegal_job=true" class="voice-chat-button"><span class="emoji">🎤</span> 音声チャット(β版)</a></p>
+        {% else %}
+        <p><a href="{% url 'dialogues:voice_chat' %}" class="voice-chat-button"><span class="emoji">🎤</span> 音声チャット(β版)</a></p>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block body_bottom_elements %}
+<div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.65); z-index: 10000; justify-content: center; align-items: center; flex-direction: column; color: white; font-size: 1.5em; text-align: center;">
+    <div style="padding: 20px;">
+        <p>評価を生成しています...</p>
+        <p style="font-size: 0.8em;">しばらくお待ちください。(最大1分程度)</p>
+        <div class="spinner" style="margin-top:20px;"></div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+    const chatLog = document.getElementById('chat-log');
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('user-message-input');
+    let sessionId = "{{ session.id|default:'' }}";  // let に変更して更新可能にする
+    const topicId = "{{ topic.id }}";
+    const isNewSession = {% if is_new_session %}true{% else %}false{% endif %};
+    const isIllegalJob = {% if is_illegal_job %}true{% else %}false{% endif %};
+    const csrfToken = "{{ csrf_token }}"; // POSTリクエスト時に使用
+
+    const submitChatButton = document.getElementById('submit-chat-button'); // ✅ 送信ボタンを取得
+    const generateStrategyBtn = document.getElementById('generate-strategy-btn'); // 戦略生成ボタン
+    const strategyArea = document.getElementById('strategy-area');
+
+    // 評価結果表示用の変数
+    let currentEvaluationScore = null;
+    let currentEvaluationReason = null;
+
+    // チャットログの自動スクロール関数
+    function scrollToBottom() {
+        if (chatLog) {
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+    }
+    scrollToBottom(); // 初期表示時にもスクロール
+
+    // ✅ 評価結果を表示する関数（折りたたみ式・スコア別色分け）
+    function addEvaluationToLog(score, reason, insertAfterElement = null) {
+        const evalDiv = document.createElement('div');
+        evalDiv.className = 'evaluation-box';
+        
+        // スコアに応じてクラスを追加（0, 1, 2）
+        if (score === 0 || score === '0') {
+            evalDiv.classList.add('score-0');
+        } else if (score === 1 || score === '1') {
+            evalDiv.classList.add('score-1');
+        } else if (score === 2 || score === '2') {
+            evalDiv.classList.add('score-2');
+        }
+        
+        const scoreDiv = document.createElement('div');
+        scoreDiv.className = 'score collapsed';
+        scoreDiv.textContent = `📊 発話評価: ${score}`;
+        
+        const reasonDiv = document.createElement('div');
+        reasonDiv.className = 'reason hidden';
+        reasonDiv.textContent = reason;
+        
+        // クリックで開閉
+        scoreDiv.addEventListener('click', function() {
+            scoreDiv.classList.toggle('collapsed');
+            reasonDiv.classList.toggle('hidden');
+        });
+        
+        evalDiv.appendChild(scoreDiv);
+        evalDiv.appendChild(reasonDiv);
+        
+        // ✅ 指定された要素の直後に挿入、またはチャットログの最後に追加
+        if (insertAfterElement && insertAfterElement.nextSibling) {
+            chatLog.insertBefore(evalDiv, insertAfterElement.nextSibling);
+        } else if (insertAfterElement) {
+            chatLog.appendChild(evalDiv);
+        } else {
+            chatLog.appendChild(evalDiv);
+        }
+        scrollToBottom();
+    }
+
+    if (generateStrategyBtn) {
+        generateStrategyBtn.addEventListener('click', function() {
+            if (!sessionId) {
+                strategyArea.innerHTML = '<p>まず対話を開始してから戦略を生成してください。</p>';
+                return;
+            }
+            
+            strategyArea.innerHTML = '<p>応答例を生成中です...</p>'; // innerHTMLを使って初期化とメッセージ表示
+            generateStrategyBtn.disabled = true;
+
+            fetch(`/dialogues/session/${sessionId}/generate_strategy/`)
+                .then(response => {
+                    if (!response.ok) { // まずレスポンスのステータスを確認
+                        return response.json().then(errData => { // エラーの場合もJSONを期待する
+                            throw new Error(errData.error || `サーバーエラー: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(result => { // result は {'success': true, 'data': LLMが生成したJSONオブジェクト} という形
+                    if (result.success && result.data && result.data.strategies) {
+                        strategyArea.innerHTML = ''; // 表示エリアをクリア
+                        if (result.data.strategies.length > 0) {
+                            const ul = document.createElement('ul');
+                            ul.style.listStyleType = 'none';
+                            ul.style.paddingLeft = '0';
+
+                            result.data.strategies.forEach(strategyItem => {
+                                const li = document.createElement('li');
+                                li.style.marginBottom = '15px';
+                                li.style.border = '1px solid #eee';
+                                li.style.padding = '10px';
+                                li.style.borderRadius = '4px';
+
+                                const strategyTitle = document.createElement('h5');
+                                strategyTitle.textContent = `${strategyItem.strategy || '戦略'}`;
+                                strategyTitle.style.marginTop = '0';
+                                strategyTitle.style.marginBottom = '5px';
+                                strategyTitle.style.fontSize = '1.1em';
+                                
+                                const exampleText = document.createElement('p');
+                                exampleText.textContent = strategyItem.example || '応答例なし';
+                                exampleText.style.whiteSpace = 'pre-wrap'; // 改行を保持
+                                exampleText.style.margin = '0';
+                                exampleText.style.fontSize = '0.95em';
+                                exampleText.style.backgroundColor = '#f9f9f9';
+                                exampleText.style.padding = '8px';
+                                exampleText.style.borderRadius = '3px';
+
+
+                                li.appendChild(strategyTitle);
+                                li.appendChild(exampleText);
+                                ul.appendChild(li);
+                            });
+                            strategyArea.appendChild(ul);
+                        } else {
+                            strategyArea.innerHTML = '<p>AIから提案された戦略がありませんでした。</p>';
+                        }
+                    } else {
+                        strategyArea.innerHTML = `<p>エラー: ${result.error || '戦略の取得に失敗しました。'}</p>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching strategy:', error);
+                    strategyArea.innerHTML = `<p>戦略の取得中にエラーが発生しました: ${error.message}</p>`;
+                })
+                .finally(() => {
+                    generateStrategyBtn.disabled = false;
+                });
+        });
+    }
+
+
+    // チャットログにメッセージを追加するヘルパー関数 (少し変更)
+    function addMessageToLog(speaker, message, timestamp, isStreaming = false, targetElement = null) {
+        const noDialogueMessage = document.getElementById('no-dialogue-message');
+        if (noDialogueMessage) {
+            noDialogueMessage.style.display = 'none';
+        }
+
+        if (isStreaming && targetElement) { // ストリーミング中の追記
+            targetElement.textContent += message;
+            targetElement.style.overflowWrap = 'break-word';
+            targetElement.style.wordBreak = 'break-word';
+        } else { // 通常のメッセージ追加
+            const p = document.createElement('p');
+            p.style.overflowWrap = 'break-word';
+            p.style.wordBreak = 'break-word';
+            
+            const strong = document.createElement('strong');
+            strong.textContent = speaker + ': ';
+            p.appendChild(strong);
+
+            const messageParts = message.split('\n');
+            messageParts.forEach((part, index) => {
+                p.appendChild(document.createTextNode(part));
+                if (index < messageParts.length - 1) {
+                    p.appendChild(document.createElement('br'));
+                }
+            });
+
+            if (timestamp) {
+                const timeSpan = document.createElement('span');
+                timeSpan.style.fontSize = '0.8em';
+                timeSpan.style.color = '#777';
+                timeSpan.textContent = ` (${timestamp})`;
+                p.appendChild(timeSpan);
+            }
+            chatLog.appendChild(p);
+            return p;
+        }
+        scrollToBottom();
+    }
+
+    if (messageInput && chatForm && submitChatButton) {
+            messageInput.addEventListener('keydown', function(event) {
+                // Ctrl+Enterで送信
+                if (event.key === 'Enter' && event.ctrlKey) {
+                    event.preventDefault();
+                    submitChatButton.click();
+                }
+            });
+    }
+
+
+    if (chatForm) {
+        chatForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const userMessage = messageInput.value.trim();
+            if (!userMessage) return;
+
+            const userMsgTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const userMessageElement = addMessageToLog('あなた (カウンセラー)', userMessage, userMsgTimestamp);
+            messageInput.value = '';
+            messageInput.focus();
+
+            const aiMessagePlaceholder = addMessageToLog('相談者 (AI)', '', 'Loading...', false, null);
+            let aiFullResponse = "";
+
+            const fetchUrl = sessionId ? 
+                `/dialogues/session/${sessionId}/chat/` :
+                (isIllegalJob ? `/dialogues/illegal_topic/${topicId}/chat/` : `/dialogues/topic/${topicId}/chat/`);
+
+            fetch(fetchUrl, {
+                method: 'POST',
+                body: new URLSearchParams({message: userMessage}),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                // セッションIDをレスポンスヘッダーから取得して更新
+                const newSessionId = response.headers.get('X-Session-Id');
+                if (newSessionId && !sessionId) {
+                    sessionId = newSessionId;
+                    console.log('Session ID updated:', sessionId);
+                    
+                    // フォームのaction属性を更新
+                    chatForm.action = `/dialogues/session/${sessionId}/chat/`;
+                    
+                    // 新規セッションの場合、評価・リセットフォームを動的に生成
+                    if (isNewSession) {
+                        const buttonContainer = document.getElementById('button-container');
+                        if (buttonContainer) {
+                            // 既存のボタンを取得
+                            const endBtn = document.getElementById('end-dialogue-button');
+                            const resetBtn = document.getElementById('reset-dialogue-button');
+                            
+                            // 評価フォームを作成
+                            const endForm = document.createElement('form');
+                            endForm.id = 'end-dialogue-form';
+                            endForm.method = 'post';
+                            endForm.action = `/dialogues/session/${sessionId}/end/`;
+                            endForm.style.margin = '0';
+                            const endCsrfInput = document.createElement('input');
+                            endCsrfInput.type = 'hidden';
+                            endCsrfInput.name = 'csrfmiddlewaretoken';
+                            endCsrfInput.value = csrfToken;
+                            endForm.appendChild(endCsrfInput);
+                            endForm.appendChild(endBtn);
+                            
+                            // リセットフォームを作成
+                            const resetForm = document.createElement('form');
+                            resetForm.id = 'reset-dialogue-form';
+                            resetForm.method = 'post';
+                            resetForm.action = `/dialogues/session/${sessionId}/reset/`;
+                            resetForm.style.margin = '0';
+                            const resetCsrfInput = document.createElement('input');
+                            resetCsrfInput.type = 'hidden';
+                            resetCsrfInput.name = 'csrfmiddlewaretoken';
+                            resetCsrfInput.value = csrfToken;
+                            resetForm.appendChild(resetCsrfInput);
+                            resetForm.appendChild(resetBtn);
+                            
+                            // buttonContainerをフォームで置き換え
+                            const parentDiv = buttonContainer.parentElement;
+                            buttonContainer.remove();
+                            parentDiv.appendChild(endForm);
+                            parentDiv.appendChild(resetForm);
+                            
+                            // ボタンを有効化
+                            endBtn.disabled = false;
+                            endBtn.type = 'submit';
+                            endBtn.style.backgroundColor = '';
+                            endBtn.style.color = '';
+                            endBtn.style.cursor = '';
+                            endBtn.setAttribute('onclick', "return confirm('対話を終了しますか？');");
+                            
+                            resetBtn.disabled = false;
+                            resetBtn.type = 'submit';
+                            resetBtn.style.backgroundColor = '';
+                            resetBtn.style.color = '';
+                            resetBtn.style.cursor = '';
+                            resetBtn.setAttribute('onclick', "return confirm('本当に対話履歴をリセットしますか？');");
+                            
+                            // 評価フォームにイベントリスナーを再設定
+                            setupEndDialogueFormListener();
+                        }
+                    }
+                } else if (sessionId) {
+                    // 既存セッションの場合、ボタンを有効化（フォームは既に存在）
+                    const endDialogueBtn = document.getElementById('end-dialogue-button');
+                    const resetDialogueBtn = document.getElementById('reset-dialogue-button');
+                    const endDialogueForm = document.getElementById('end-dialogue-form');
+                    const resetDialogueForm = document.getElementById('reset-dialogue-form');
+                    
+                    if (endDialogueBtn && endDialogueBtn.disabled && endDialogueForm) {
+                        endDialogueBtn.disabled = false;
+                        endDialogueBtn.style.backgroundColor = '';
+                        endDialogueBtn.style.color = '';
+                        endDialogueBtn.style.cursor = '';
+                        endDialogueBtn.setAttribute('onclick', "return confirm('対話を終了しますか？');");
+                    }
+                    if (resetDialogueBtn && resetDialogueBtn.disabled && resetDialogueForm) {
+                        resetDialogueBtn.disabled = false;
+                        resetDialogueBtn.style.backgroundColor = '';
+                        resetDialogueBtn.style.color = '';
+                        resetDialogueBtn.style.cursor = '';
+                        resetDialogueBtn.setAttribute('onclick', "return confirm('本当に対話履歴をリセットしますか？');");
+                    }
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function readChunk() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            if (aiMessagePlaceholder) {
+                                const timeSpan = aiMessagePlaceholder.querySelector('span');
+                                if (timeSpan) timeSpan.textContent = ` (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})`;
+                            }
+                            return;
+                        }
+                        const chunkText = decoder.decode(value);
+                        const lines = chunkText.split('\n');
+                        lines.forEach(line => {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const jsonData = JSON.parse(line.substring(5));
+                                    if (jsonData.evaluation) {
+                                        // ✅ 評価結果をユーザーメッセージの直後に表示
+                                        addEvaluationToLog(jsonData.evaluation.score, jsonData.evaluation.reason, userMessageElement);
+                                    } else if (jsonData.text_chunk) {
+                                        aiFullResponse += jsonData.text_chunk;
+                                        if (aiMessagePlaceholder) {
+                                            let messageNode = aiMessagePlaceholder.childNodes[1];
+                                            if (!messageNode || messageNode.nodeType !== Node.TEXT_NODE) {
+                                                messageNode = document.createTextNode("");
+                                                aiMessagePlaceholder.insertBefore(messageNode, aiMessagePlaceholder.querySelector('span'));
+                                            }
+                                            messageNode.textContent += jsonData.text_chunk;
+                                            scrollToBottom();
+                                        }
+                                    } else if (jsonData.error) {
+                                        console.error('Stream error from server:', jsonData.error);
+                                        if (aiMessagePlaceholder) aiMessagePlaceholder.textContent += `\nエラー: ${jsonData.error}`;
+                                    }
+                                } catch (e) {
+                                    // JSON parse error
+                                }
+                            }
+                        });
+                        readChunk();
+                    });
+                }
+                readChunk();
+            })
+            .catch(error => {
+                console.error('Fetch streaming error:', error);
+                if (aiMessagePlaceholder) {
+                     aiMessagePlaceholder.textContent += `\n通信エラー: ${error.message}`;
+                }
+            });
+        });
+    }
+
+    // 評価フォームのイベントリスナー設定を関数化
+    function setupEndDialogueFormListener() {
+        const endDialogueFormElement = document.getElementById('end-dialogue-form');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        if (endDialogueFormElement && !endDialogueFormElement.dataset.listenerAttached) {
+            endDialogueFormElement.dataset.listenerAttached = 'true'; // 重複登録防止
+            endDialogueFormElement.addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                if (!sessionId && !endDialogueFormElement.action.includes('/session/')) {
+                    alert('セッションが開始されていません。まずメッセージを送信してください。');
+                    return;
+                }
+                
+                if (messageInput) messageInput.disabled = true;
+                if (submitChatButton) submitChatButton.disabled = true;
+                if (generateStrategyBtn) generateStrategyBtn.disabled = true;
+
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'flex';
+                }
+
+                fetch(endDialogueFormElement.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`サーバーエラー: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (loadingOverlay) {
+                        loadingOverlay.style.display = 'none';
+                    }
+
+                    if (data.success) {
+                        if (data.message) {
+                            alert(data.message);
+                        }
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert(data.message || data.error || 'エラーが発生しました。');
+                        if (messageInput) messageInput.disabled = false;
+                        if (submitChatButton) submitChatButton.disabled = false;
+                        if (generateStrategyBtn) generateStrategyBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    if (loadingOverlay) {
+                        loadingOverlay.style.display = 'none';
+                    }
+                    console.error('評価リクエストエラー:', error);
+                    alert('通信エラーが発生しました: ' + error.message);
+                    if (messageInput) messageInput.disabled = false;
+                    if (submitChatButton) submitChatButton.disabled = false;
+                    if (generateStrategyBtn) generateStrategyBtn.disabled = false;
+                });
+            });
+        }
+    }
+
+    // 初期ロード時に既存フォームがあればリスナーを設定
+    setupEndDialogueFormListener();
+
+</script>
+{% endblock %}
+
