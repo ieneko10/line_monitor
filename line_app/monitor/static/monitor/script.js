@@ -97,11 +97,23 @@ setInterval(function() {
 // 返信フォームの送信処理
 const replyForm = document.getElementById('reply-form');
 if (replyForm) {
+    const replyInput = document.getElementById('reply-message-input');
+
+    if (replyInput) {
+        replyInput.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                replyForm.requestSubmit();
+            }
+        });
+    }
+
     replyForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(replyForm);
         const csrfToken = formData.get('csrfmiddlewaretoken');
-        const message = formData.get('message');
+        const message = String(formData.get('message') || '').trim();
+        if (!message) return;
         
         fetch(replyForm.action, {
             method: 'POST',
@@ -111,15 +123,16 @@ if (replyForm) {
             },
             body: new URLSearchParams(formData)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('reply-message-input').value = '';
-                // チャットログを即座に更新
-                const chatLog = document.querySelector('.chat-log');
-                if (chatLog) {
-                    chatLog.scrollTop = chatLog.scrollHeight;
-                }
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            if (replyInput) {
+                replyInput.value = '';
+            }
+            const chatLog = document.querySelector('.chat-log');
+            if (chatLog) {
+                chatLog.scrollTop = chatLog.scrollHeight;
             }
         })
         .catch(error => console.error('Reply error:', error));

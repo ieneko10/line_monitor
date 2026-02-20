@@ -43,7 +43,7 @@
         {% csrf_token %}
         <div class="form-row">
             <textarea name="message" id="reply-message-input" rows="5" cols="130" placeholder="返信メッセージを入力..." {% if session.session_data.response_mode != 'Human' %}disabled{% endif %} required></textarea>
-            <button type="submit" id="send-reply-button" {% if session.session_data.response_mode != 'Human' %}disabled{% endif %}>送信</button>
+            <button type="submit" id="send-reply-button" {% if session.session_data.response_mode != 'Human' %}disabled{% endif %}>送信<br>Ctrl+Enter</button>
         </div>
     </form>
 </div>

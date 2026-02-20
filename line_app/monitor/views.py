@@ -1,6 +1,8 @@
 import json
 import re
 
+from linebot.v3.messaging.exceptions import ApiException
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
@@ -184,7 +186,11 @@ def send_reply(request, user_id):
             session_id=session_id,
         )
         save_dialogue_history(user_id, 'counselor', message, session_id, post_time)
-    except Exception as e:
+        
+    except ApiException as e:
         logger.error(f"Failed to send reply: {e}")
+    
+    except Exception as e:
+        logger.error(f'??? Unexpected error')
     
     return redirect('monitor:session_detail', user_id=user_id)
