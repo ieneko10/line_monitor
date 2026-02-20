@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'monitor/sample.css' %}">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<div>
+    <h1>Sample</h1>
+    <p class="emphasized">This is a sample page.</p>
+    <p class="sample-element">This element is for testing.</p>
+    <div class="sample-element">
+        This is another sample element.
+    </div>
+    <button type="button" id="sampleButton">サンプルボタン</button>
+</div>
+
+<script src="{% static 'monitor/sample.js' %}"></script>
+<script src="{% static 'monitor/sample2.js' %}"></script>
+
+{% endblock %}

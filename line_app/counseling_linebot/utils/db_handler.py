@@ -44,6 +44,7 @@ def register_user(user_id):
         "survey_mode": False,
         "survey_progress": 0,
         "finished": True,
+        "response_mode": "AI",
         "session_id": ''
     }
     Session.objects.update_or_create(

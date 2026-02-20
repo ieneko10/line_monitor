@@ -11,6 +11,7 @@ class Session(models.Model):
 	               "survey_progress": int,     #アンケートの進行度
 	               "finished": bool,           #カウンセリングが終了しているかどうか
 	               "session_id": str,          #セッションID（ランダムな文字列）
+	               "response_mode": str,       #応答モード（"AI" or "Human"）デフォルトは"AI"
 	               }
 	# ユーザのLINE上のボタンの状態を管理する文字列．ユーザはボタン以外の動作（リッチメニュー操作や任意のテキスト送信）が可能なので，それらを無効にする
 	flag: str: 'accepted', 'start_chat', 'reset_history', 'consent

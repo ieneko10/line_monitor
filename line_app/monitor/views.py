@@ -2,8 +2,31 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
+from django.conf import settings
 from counseling_linebot.models import Session, ChatHistory
 import re
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+from logger.set_logger import start_logger
+from logger.ansi import * 
+
+# ロガーと設定の読み込み
+conf = settings.MAIN_CONFIG
+logger = start_logger(conf["LOGGER"]["SYSTEM"])
+
+def sample_view(request):
+    return render(request, 'sample.html')
+
+@require_POST
+def sample_log(request):
+    import json
+    data = json.loads(request.body)
+    if data.get('is_cancel'):
+        logger.info("解除ボタンが押された")
+    else:
+        logger.info("Sample button pressed.")
+    return JsonResponse({"ok": True})
 
 @login_required
 def monitor(request):
@@ -41,9 +64,17 @@ def session_detail(request, user_id):
     for log in logs:
         if log.speaker == 'assistant':
             log.message = re.sub(r'^\[[^\]]*\]\s*', '', log.message)
+    
+    # セッション情報を取得
+    try:
+        session = Session.objects.get(user_id=user_id)
+    except Session.DoesNotExist:
+        session = None
+    
     context = {
         "user_id": user_id,
         "logs": logs,
+        "session": session,
     }
     return render(request, "monitor_detail.html", context)
 
@@ -80,13 +111,66 @@ def logout_view(request):
 @login_required
 def session_stop(request, user_id):
     """
-    セッションを停止する
+    セッションのモードを切り替える
     """
     if request.method == "POST":
         try:
             session = Session.objects.get(user_id=user_id)
-            session.session_data['counseling_mode'] = False
+            # response_modeをトグル（デフォルトは"AI"）
+            current_response_mode = session.session_data.get('response_mode', 'AI')
+            if current_response_mode == 'AI':
+                session.session_data['response_mode'] = 'Human'
+                session.session_data['counseling_mode'] = False
+            else:
+                session.session_data['response_mode'] = 'AI'
+                session.session_data['counseling_mode'] = True
             session.save()
             return redirect('monitor:session_detail', user_id=user_id)
         except Session.DoesNotExist:
             return redirect('monitor:session_detail', user_id=user_id)
+
+
+@login_required
+def send_reply(request, user_id):
+    """
+    モニター画面から返信を送信する
+    """
+    if request.method == "POST":
+        message = request.POST.get('message', '').strip()
+        if message:
+            from linebot.v3.messaging import (
+                MessagingApi,P
+                PushMessageRequest,
+                TextMessage
+            )
+            from linebot.v3.messaging import Configuration
+            from django.utils import timezone
+            
+            # メッセージをLINEに送信
+            try:
+                configuration = Configuration(access_token=settings.MAIN_CONFIG['LINE_ACCESS_TOKEN'])
+                with MessagingApi(configuration) as api:
+                    api.push_message(
+                        PushMessageRequest(
+                            to=user_id,
+                            messages=[TextMessage(text=message)]
+                        )
+                    )
+                
+                # チャット履歴に保存
+                ChatHistory.objects.create(
+                    user_id=user_id,
+                    speaker='assistant',
+                    message=message,
+                    post_time=timezone.now()
+                )
+                
+                logger.info(f"[Monitor Reply] Sent message to user {user_id}")
+                return JsonResponse({"success": True})
+            except Exception as e:
+                logger.error(f"[Monitor Reply Error] {str(e)}")
+                return JsonResponse({"success": False, "error": str(e)}, status=500)
+        
+        return JsonResponse({"success": False, "error": "No message provided"}, status=400)
+    
+    return JsonResponse({"success": False, "error": "Invalid method"}, status=405)
