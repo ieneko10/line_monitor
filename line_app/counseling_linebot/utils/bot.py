@@ -224,8 +224,8 @@ class CounselorBot:
         try:
             rows = (
                 ChatHistory.objects.filter(user_id=user_id)
-                .order_by("-id")
-                .values_list("speaker", "message", "finished")[:context_num]
+                .order_by("-id")   # 新しいレコード順（id 降順）に並べる
+                .values_list("speaker", "message", "finished")[:context_num]    # モデル全体ではなく3列だけ取得して軽量化したあと，先頭から最大 context_num 件に制限
             )
 
             history: ChatHistory = []
@@ -346,20 +346,3 @@ class CounselorBot:
             logger.debug(f"[ERROR] Error processing message from user {user_id}: {e}")
             return "エラーが発生しました。もう一度お試しください。", False
 
-
-# if __name__ == "__main__":
-#     bot = CounselorBot(
-#         db_path="chat_history.db",
-#         init_message=INIT_MESSAGE,
-#         api_key=OPENAI_API_KEY,
-#         system_prompt_path="prompt/system_prompt.txt",
-#         example_files=[
-#             "prompt/case1_0.txt",
-#             "prompt/case2_0.txt",
-#             "prompt/case3_0.txt",
-#             "prompt/case4_0.txt",
-#             "prompt/case5_0.txt",
-#             "prompt/case6_1.txt",
-#         ]
-#     )
-#     print(bot.start_message("test"))

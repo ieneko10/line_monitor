@@ -40,6 +40,10 @@
     justify-content: flex-end;
 }
 
+.message.counselor {
+    justify-content: flex-end;
+}
+
 .message-content {
     display: block;
     padding: 8px 10px;
@@ -73,6 +77,13 @@
     border-top-right-radius: 4px;
 }
 
+.message.counselor .message-content {
+    background-color: #e3f2fd;
+    color: #333;
+    border: 1px solid #bbdefb;
+    border-top-right-radius: 4px;
+}
+
 .message-meta {
     margin-bottom: 2px;
     font-size: 0.8em;
@@ -87,6 +98,10 @@
 }
 
 .message.assistant .message-meta {
+    justify-content: flex-end;
+}
+
+.message.counselor .message-meta {
     justify-content: flex-end;
 }
 

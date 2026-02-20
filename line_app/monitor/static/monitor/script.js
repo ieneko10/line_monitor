@@ -1,12 +1,16 @@
 document.addEventListener('click', function(e) {
     if (e.target && e.target.id === 'stopButton') {
         const userId = e.target.dataset.userId;
+        const action = e.target.textContent.trim() === '応答モードに切り替え';
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
         fetch(`/monitor/session/stop/${userId}/`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': csrfToken
-            }
+                'X-CSRFToken': csrfToken,
+				'Content-Type': 'application/json'
+            },
+			credentials: 'same-origin',
+            body: JSON.stringify({ user_id: userId, human: action })
         })
         .then(() => window.location.reload())
         .catch(error => console.error('Toggle error:', error));
@@ -30,45 +34,65 @@ function getCookie(name) {
 
 
 // 更新ロジック:
-//  1. 更新前のスクロール位置とメッセージ数を保存
-//  2. 新しいメッセージが追加されたか、または元々一番下にあったかをチェック
-//  3. いずれかの場合は一番下にスクロール
-//  4. そうでない場合は、元のスクロール位置に復元
+//  1. ユーザーごとの最新ChatHistory IDだけを定期取得
+//  2. 最新IDが増えたときだけページ内容を更新
+//  3. スクロール位置は従来どおり保持
 setInterval(function() {
-    const chatLog = document.querySelector('.chat-log');
-    const scrollTop = chatLog ? chatLog.scrollTop : 0;
-    const scrollHeight = chatLog ? chatLog.scrollHeight : 0;
-    const isAtBottom = chatLog ? (scrollTop + chatLog.clientHeight >= scrollHeight - 10) : false;
-    const messageCount = document.querySelectorAll('.message').length;
-    
-    fetch(window.location.href)
-        .then(response => response.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const newDoc = parser.parseFromString(html, 'text/html');
-            const newContent = newDoc.querySelector('.log-container');
-            const oldContent = document.querySelector('.log-container');
-            if (newContent && oldContent) {
-                oldContent.replaceWith(newContent);
-                
-                const newChatLog = document.querySelector('.chat-log');
-                const newMessageCount = document.querySelectorAll('.message').length;
-                
-                if (newChatLog) {
-                    if (newMessageCount > messageCount || isAtBottom) {
-                        // 新しいメッセージが追加されたか、元々一番下にいた場合は一番下にスクロール
-                        setTimeout(() => {
-                            newChatLog.scrollTop = newChatLog.scrollHeight;
-                        }, 0);
-                    } else {
-                        // メッセージ数が変わらない場合はスクロール位置を復元
-                        newChatLog.scrollTop = scrollTop;
-                    }
-                }
+    const container = document.querySelector('.log-container');
+    const userId = container?.dataset.userId;
+    if (!userId) return;
+
+    const knownLatestId = Number(container.dataset.lastLogId || 0);
+
+    fetch(`/monitor/session/history-status/${userId}/`, { credentials: 'same-origin' })
+        .then(response => response.json())
+        .then(status => {
+            const latestId = Number(status.latest_id || 0);
+            // console.log(latestId, knownLatestId);
+            if (latestId <= knownLatestId) {
+                return;
             }
+
+            const chatLog = document.querySelector('.chat-log');
+            const scrollTop = chatLog ? chatLog.scrollTop : 0;
+            const scrollHeight = chatLog ? chatLog.scrollHeight : 0;
+            const isAtBottom = chatLog ? (scrollTop + chatLog.clientHeight >= scrollHeight - 10) : false;
+            const messageCount = document.querySelectorAll('.message').length;
+
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const newDoc = parser.parseFromString(html, 'text/html');
+                    const newLogArea = newDoc.querySelector('.chat-log-area');
+                    const oldLogArea = document.querySelector('.chat-log-area');
+                    if (newLogArea && oldLogArea) {
+                        oldLogArea.replaceWith(newLogArea);
+                        const currentContainer = document.querySelector('.log-container');
+                        if (currentContainer) {
+                            currentContainer.dataset.lastLogId = String(latestId);
+                        }
+
+                        const newChatLog = document.querySelector('.chat-log');
+                        const newMessageCount = document.querySelectorAll('.message').length;
+
+                        if (newChatLog) {
+                            if (newMessageCount > messageCount || isAtBottom) {
+                                setTimeout(() => {
+                                    newChatLog.scrollTop = newChatLog.scrollHeight;
+                                }, 0);
+                            } else {
+                                newChatLog.scrollTop = scrollTop;
+                            }
+                        }
+                    }
+                })
+                .catch(error => console.error('Update error:', error));
         })
-        .catch(error => console.error('Update error:', error));
+        .catch(error => console.error('Status check error:', error));
 }, 5000);
+
+
 
 // 返信フォームの送信処理
 const replyForm = document.getElementById('reply-form');

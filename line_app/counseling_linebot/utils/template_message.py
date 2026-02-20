@@ -35,7 +35,7 @@ LINE_ACCESS_TOKEN = conf["LINE_ACCESS_TOKEN"]
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 configuration = Configuration(access_token=LINE_ACCESS_TOKEN)
 
-def reply_to_line_user(event, message):
+def reply_to_line_user(reply_token, message):
     
     msgs = split_message(message)
 
@@ -44,7 +44,7 @@ def reply_to_line_user(event, message):
 
         # 返信リクエストを作成
         reply_request = ReplyMessageRequest(
-            reply_token=event.reply_token,
+            reply_token=reply_token,
             messages=msgs
         )
 

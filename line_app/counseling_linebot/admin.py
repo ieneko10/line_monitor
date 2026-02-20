@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import Session, Setting, ChatHistory
+from .models import Session, Setting, ChatHistory, ReplyToken
 from django.contrib import admin
-from .models import Session, Setting, ChatHistory
+from .models import Session, Setting, ChatHistory, ReplyToken
 
 
 @admin.register(Session)
@@ -35,3 +35,10 @@ class ChatHistoryAdmin(admin.ModelAdmin):
     def short_message(self, obj):
         return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
     short_message.short_description = 'メッセージ'
+
+
+@admin.register(ReplyToken)
+class ReplyTokenAdmin(admin.ModelAdmin):
+    list_display = ('user_id', 'token', 'created_at')
+    search_fields = ('user_id', 'token')
+    ordering = ('-created_at',)

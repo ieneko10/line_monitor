@@ -6,6 +6,7 @@ app_name = 'monitor'
 urlpatterns = [
     path('', views.monitor, name='monitor'),
     path('sessions/<str:user_id>/', views.session_detail, name='session_detail'),
+    path('session/history-status/<str:user_id>/', views.chat_history_status, name='chat_history_status'),
     path('session/stop/<str:user_id>/', views.session_stop, name='session_stop'),
     path('session/reply/<str:user_id>/', views.send_reply, name='send_reply'),
     path('sample/', views.sample_view, name='sample'),

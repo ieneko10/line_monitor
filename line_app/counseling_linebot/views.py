@@ -14,6 +14,7 @@ from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration
 from linebot.v3.webhooks import MessageEvent, FollowEvent, PostbackEvent
 from django.conf import settings
+from django.utils import timezone
 
 # 既存実装の再利用（Flask版と同等機能）
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -22,8 +23,9 @@ sys.path.insert(0, str(LEGACY_DIR))
 
 from logger.set_logger import start_logger
 from logger.ansi import * 
-from counseling_linebot.utils.bot import CounselorBot
+from counseling_linebot.models import ChatHistory
 from counseling_linebot.utils import richmenu 
+from counseling_linebot.utils.bot import CounselorBot
 from counseling_linebot.utils.maintenance import FileChangeHandler, maintenance_mode_on 
 from counseling_linebot.utils.db_handler import (
 	set_maintenance_mode,
@@ -42,6 +44,9 @@ from counseling_linebot.utils.db_handler import (
 	set_time,
 	init_survey,
 	save_survey_results,
+	check_and_reset_session,
+ 	save_dialogue_history,
+	add_reply_token,
 )
 from counseling_linebot.utils.tool import (
 	TrackableTimer,
@@ -184,7 +189,7 @@ def handle_follow(event):
 				"友達登録ありがとうございます。\n\n現在、メンテナンス中のため、操作を受け付けていません。"
 				"\n\nしばらく時間をおいてから再度お試しください。"
 			)
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 			richmenu.apply_richmenu(
 				richmenu_ids["MAINTENANCE"], user_id
 			)  # メンテナンス用のリッチメニューを適用
@@ -211,7 +216,7 @@ def handle_follow(event):
 
 		msg = "友達登録ありがとうございます！\n\n対話を開始するには、下のメニューを開き、操作を行ってください。"
 		logger.debug(f"\t[Send Message] user: {user_id}\n\t  {repr(msg)}")
-		reply_to_line_user(event, msg)
+		reply_to_line_user(event.reply_token, msg)
 
 	init_survey(user_id)  # アンケートを初期化
 
@@ -227,7 +232,7 @@ def handle_postback(event):
 			f"\t[Maintenance Mode] user: {event.source.user_id} tried to postback during maintenance mode."
 		)
 		msg = "現在、メンテナンス中のため、操作を受け付けていません。\n\nしばらく時間をおいてから再度お試しください。"
-		reply_to_line_user(event, msg)
+		reply_to_line_user(event.reply_token, msg)
 		if event.postback.data != "maintenance":
 			richmenu.apply_richmenu(
 				richmenu_ids["MAINTENANCE"], user_id, tabs=1
@@ -263,7 +268,7 @@ def handle_postback(event):
 	elif event.postback.data == "no_consent":
 		msg = "ご同意いただけない場合は、カウンセリング対話を開始できません。"
 		logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-		reply_to_line_user(event, msg)
+		reply_to_line_user(event.reply_token, msg)
 
 	elif event.postback.data == "shop":
 		shop(event, tunnel)
@@ -283,12 +288,12 @@ def handle_postback(event):
 		if NEED_START_KEYWORD and session["keyword_accepted"] == False:
 			msg = "カウンセリング対話を開始する前に、同意が必要です。\n\n下のメニューから同意を行ってください。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 
 		elif session["counseling_mode"] == True:
 			msg = "すでにカウンセリング対話が開始されています。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 			richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id)
 
 		else:
@@ -296,7 +301,7 @@ def handle_postback(event):
 			if session_time == 0:
 				msg = "メニューからご希望の時間を選択してください。"
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-				reply_to_line_user(event, msg)
+				reply_to_line_user(event.reply_token, msg)
 
 			else:
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\tカウンセリング対話の開始確認メッセージを送信")
@@ -311,7 +316,8 @@ def handle_postback(event):
 				save_flag(user_id, flag="start_chat")  # フラグを保存
 				logger.debug(f"\t[Save Flag] flag: start_chat, user: {user_id}")
 	elif event.postback.data == "end_chat":
-		assert session["counseling_mode"] == True, "カウンセリングモードでないのにend_chatが呼ばれました"
+		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
+			return
 
 		logger.debug(f"\t[Send Message] user: {user_id}\n\t\tカウンセリング対話の終了確認メッセージを送信")
 		send_yes_no_buttons(
@@ -324,24 +330,49 @@ def handle_postback(event):
 		save_flag(user_id, flag="end_chat")  # フラグを保存
 		logger.debug(f"\t[Save Flag] flag: end_chat, user: {user_id}")
 	elif event.postback.data == "check_time":
+		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
+			return
 		logger.debug(f"\t[Checking Remaining Time] user {user_id}")
-		with threading.Lock():
-			remaining_time = timers[user_id].remaining_time()
-		remaining_time = remaining_time // 60
-		richmenu.apply_richmenu(richmenu_ids["REMAINING_TIME"][remaining_time], user_id)
+		try:
+			with threading.Lock():
+				remaining_time = timers[user_id].remaining_time()
+				remaining_time = remaining_time // 60
+				richmenu.apply_richmenu(richmenu_ids["REMAINING_TIME"][remaining_time], user_id)
+		except KeyError:
+			logger.warning(f"\t[Warning] ユーザ'{user_id}'のタイマーが見つかりませんでした。")
+			richmenu.apply_richmenu(richmenu_ids["START"], user_id, tabs=2)
+			if session["counseling_mode"] == True:
+				logger.warning(f"\t[Warning] ユーザ'{user_id}'はカウンセリングモードですが、タイマーが見つかりませんでした。セッションをリセットします。")
+				session["counseling_mode"] = False
+				save_session(user_id, session)
 
 	elif event.postback.data == "back_to_menu":
+		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
+			return
 		logger.debug(f"\t[Back to Menu] user {user_id}")
 		richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id)
 
 	elif event.postback.data == "update_time":
+		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
+			return
 		logger.debug(f"\t[Update Remaining Time] user {user_id}")
-		with threading.Lock():
-			remaining_time = timers[user_id].remaining_time()
-		remaining_time = remaining_time // 60
+		try:
+			with threading.Lock():
+				remaining_time = timers[user_id].remaining_time()
+				remaining_time = remaining_time // 60
+		except KeyError:
+			logger.warning(f"\t[Warning] ユーザ'{user_id}'のタイマーが見つかりませんでした。")
+			richmenu.apply_richmenu(richmenu_ids["START"], user_id, tabs=2)
+			if session["counseling_mode"] == True:
+				logger.warning(f"\t[Warning] ユーザ'{user_id}'はカウンセリングモードですが、タイマーが見つかりませんでした。セッションをリセットします。")
+				session["counseling_mode"] = False
+				save_session(user_id, session)
+				return
 		richmenu.apply_richmenu(richmenu_ids["REMAINING_TIME"][remaining_time], user_id)
 
 	elif event.postback.data == "end_survey":
+		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
+			return
 		logger.debug(f"\t[Send Message] user: {user_id}\n\t\tアンケートの終了確認メッセージを送信")
 		send_yes_no_buttons(
 			configuration,
@@ -372,7 +403,7 @@ def handle_message(event):
 			f"\t[Maintenance Mode] user: {event.source.user_id} tried to send a message during maintenance mode."
 		)
 		msg = "現在、メンテナンス中のため、メッセージを受け付けていません。\n\nしばらく時間をおいてから再度お試しください。"
-		reply_to_line_user(event, msg)
+		reply_to_line_user(event.reply_token, msg)
 		return
 
 	user_id = event.source.user_id
@@ -391,7 +422,7 @@ def handle_message(event):
 
 			msg = "ご同意ありがとうございます。メニューのShopからご希望の時間を選択してください。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 			richmenu.apply_richmenu(richmenu_ids["START"], user_id)
 
 		else:
@@ -401,12 +432,12 @@ def handle_message(event):
 
 			msg = "ご同意いただけない場合は、カウンセリング対話を開始できません。\n\n同意はいつでも下のメニューから行えます。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 
 	elif NEED_START_KEYWORD and session["keyword_accepted"] == False:
 		msg = "下のメニューから同意を行うことで、カウンセリング対話を開始できます。"
 		logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-		reply_to_line_user(event, msg)
+		reply_to_line_user(event.reply_token, msg)
 
 	elif flag == "start_chat":
 		if event.message.text == YES:
@@ -417,7 +448,7 @@ def handle_message(event):
 				timers[user_id] = timer
 
 			session["counseling_mode"] = True
-			session["session_id"] = generate_session_id(n=10)
+			# session["session_id"] = generate_session_id(n=10)
 			save_session(user_id, session)
 			logger.debug(
 				f"\t[Save Session] user: {user_id}\n\t\tcounseling_mode: {session['counseling_mode']}\n\t\tsessionID: {session['session_id']}"
@@ -434,14 +465,14 @@ def handle_message(event):
 			else:
 				msg = "カウンセリング対話を再開します。\n\n新しく会話を始める場合は、メニューから“Reset”ボタンを押してください。"
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-				reply_to_line_user(event, msg)
+				reply_to_line_user(event.reply_token, msg)
 
 			logger.info(f"\t[Counseling Start] user: {user_id}, session_time: {session_time} seconds")
 
 		else:
 			msg = "カウンセリング対話を開始したい場合、もう一度メニューから“Start Chat”を選択して下さい。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 
 	elif flag == "reset_history":
 		if event.message.text == YES:
@@ -461,27 +492,28 @@ def handle_message(event):
 				],
 			)
 			bot.finish_dialogue(user_id)
-			session["finished"] = True
+			session["session_id"] = generate_session_id(n=10)
 			if session["counseling_mode"] == True:
+				save_session(user_id, session)
+				logger.debug(f"\t[Save Session] user: {user_id}\n\t\tfinished: {session['finished']}\n\t\tsession_id: {session['session_id']}")
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t対話履歴をリセットし，カウンセリング対話を開始")
 				start_chat(event, reset=True)
 			else:
 				session["finished"] = True
 				save_session(user_id, session)
-				logger.debug(f"\t[Save Session] user: {user_id}\n\t\tfinished: {session['finished']}")
-
+				logger.debug(f"\t[Save Session] user: {user_id}\n\t\tfinished: {session['finished']}\n\t\tsession_id: {session['session_id']}")
 				msg = "対話履歴をリセットしました。"
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-				reply_to_line_user(event, msg)
+				reply_to_line_user(event.reply_token, msg)
 		else:
 			msg = "対話履歴のリセットをキャンセルしました。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-			reply_to_line_user(event, msg)
+			reply_to_line_user(event.reply_token, msg)
 
 	elif session["keyword_accepted"] == True and session["counseling_mode"] == False and not session["survey_mode"] == True:
 		msg = "カウンセリング対話を開始するには、メニューからご希望の時間を選択してください。"
 		logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-		reply_to_line_user(event, msg)
+		reply_to_line_user(event.reply_token, msg)
 
 	elif session["counseling_mode"] == True:
 		if flag == "end_chat":
@@ -493,9 +525,18 @@ def handle_message(event):
 					f"\t[Save Session] user: {user_id}\n\t\tcounseling_mode: {session['counseling_mode']}\n\t\tsurvey_mode: {session['survey_mode']}"
 				)
 
-				with threading.Lock():
-					remaining_time = timers[user_id].cancel()
-					del timers[user_id]
+				try:
+					with threading.Lock():
+						remaining_time = timers[user_id].cancel()
+						del timers[user_id]
+				except KeyError:
+					logger.warning(f"\t[Warning] ユーザ'{user_id}'のタイマーが見つかりませんでした。")
+					remaining_time = 0
+					if session["counseling_mode"] == True:
+						logger.warning(f"\t[Warning] ユーザ'{user_id}'はカウンセリングモードですが、タイマーが見つかりませんでした。セッションをリセットします。")
+						session["counseling_mode"] = False
+						save_session(user_id, session)
+					return
 				set_time(user_id, remaining_time)
 				logger.info(f"[Counseling End] user: {user_id}, remaining_time: {remaining_time} seconds")
 
@@ -508,12 +549,29 @@ def handle_message(event):
 			else:
 				msg = "対話を続けます。"
 				logger.debug(f"[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-				reply_to_line_user(event, msg)
+				reply_to_line_user(event.reply_token, msg)
 
 		else:
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\tカウンセリング対話のメッセージを送信")
-			reply(event, tunnel)
-			return
+			mode = session['response_mode']
+			logger.info(f"\t[Mode] {mode}, type:{type(event.reply_token)}")
+			add_reply_token(user_id, event.reply_token)
+			if session['response_mode'] == 'Human':
+				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t人間が対応中のため、メッセージを送信せずに終了")
+				post_time = timezone.now()
+				logger.debug(f"\t[Save Dialogue History] message: {event.message.text}")
+				ChatHistory.objects.create(
+					user_id=user_id,
+					speaker="user",
+					message=event.message.text,
+					post_time=post_time,
+					finished=0,
+					session_id=session["session_id"],
+				)
+				save_dialogue_history(user_id, 'user', event.message.text, session["session_id"], post_time)
+				return
+			else:     # response_mode == 'AI'
+				reply(event, tunnel)
 
 	elif session["survey_mode"] == True:
 		if flag == "start_survey":
@@ -537,7 +595,7 @@ def handle_message(event):
 				richmenu.apply_richmenu(richmenu_ids["START"], user_id)
 				msg = "ご利用ありがとうございました。"
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-				reply_to_line_user(event, msg)
+				reply_to_line_user(event.reply_token, msg)
 
 		elif flag == "end_survey":
 			if event.message.text == NO:
@@ -557,7 +615,7 @@ def handle_message(event):
 				richmenu.apply_richmenu(richmenu_ids["START"], user_id)
 				msg = "ご利用ありがとうございました。"
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
-				reply_to_line_user(event, msg)
+				reply_to_line_user(event.reply_token, msg)
 
 		else:
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\tアンケートの送信")

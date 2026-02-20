@@ -14,7 +14,7 @@ class Session(models.Model):
 	               "response_mode": str,       #応答モード（"AI" or "Human"）デフォルトは"AI"
 	               }
 	# ユーザのLINE上のボタンの状態を管理する文字列．ユーザはボタン以外の動作（リッチメニュー操作や任意のテキスト送信）が可能なので，それらを無効にする
-	flag: str: 'accepted', 'start_chat', 'reset_history', 'consent
+	flag: str: 'accepted', 'start_chat', 'reset_history', 'consent'
 	time: セッションの時間（秒）
 	survey: dict[question]: アンケートの回答
 	"""
@@ -37,3 +37,8 @@ class ChatHistory(models.Model):
 	post_time = models.DateTimeField()
 	finished = models.IntegerField(default=0)
 	session_id = models.CharField(max_length=64, default="")
+
+class ReplyToken(models.Model):
+	user_id = models.CharField(max_length=255, default="")
+	token = models.TextField()
+	created_at = models.DateTimeField()

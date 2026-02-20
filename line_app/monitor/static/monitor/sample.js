@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
 					'Content-Type': 'application/json'
 				},
 				credentials: 'same-origin',
-				body: JSON.stringify({ is_cancel: isCancel })
+				body: JSON.stringify({ is_cancel: isCancel , ok: true })
 			})
 			.then(response => response.json())
 			.then(data => {

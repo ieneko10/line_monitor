@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 
 # 自作モジュールのインポート
 from logger.set_logger import start_logger
@@ -6,7 +7,8 @@ from logger.ansi import *
 from django.conf import settings
 from django.utils import timezone
 from django.db import models
-from counseling_linebot.models import Session, Setting, ChatHistory
+from counseling_linebot.models import Session, Setting, ChatHistory, ReplyToken
+from counseling_linebot.utils import richmenu 
 
 # ロガーと設定の読み込み
 conf = settings.MAIN_CONFIG
@@ -249,4 +251,32 @@ def save_dialogue_history(user_id, speaker, message, finished, post_time):
             message = message.replace("\n", "\\n")
         w.write(f"{post_time}\t{finished}\t{speaker.ljust(9)}\t{message}\n")
 
+
+def add_reply_token(user_id, token, tabs=0):
+    delete_expired_reply_tokens(tabs=tabs)
+    if not token:
+        return
+    ReplyToken.objects.create(user_id=user_id, token=token, created_at=timezone.now())
+    indent = "\t" * tabs
+    logger.debug(f"{indent}[Add ReplyToken] user: {user_id}, token: {token}")
+
+
+def delete_expired_reply_tokens(tabs=0):
+    cutoff = timezone.now() - timedelta(minutes=3)
+    deleted_count, _ = ReplyToken.objects.filter(created_at__lt=cutoff).delete()
+    indent = "\t" * tabs
+    logger.debug(f"{indent}[Delete ReplyToken] deleted: {deleted_count}")
+    return deleted_count
+
     
+def check_and_reset_session(user_id, richmenu_ids, tabs=0):
+    session = get_session(user_id, tabs=tabs)
+    if session['counseling_mode'] == False:
+        session['survey_mode'] = False
+        richmenu.apply_richmenu(richmenu_ids["START"], user_id)
+        indent = "\t" * tabs
+        logger.warning(f"{indent}[Reset Session]  '{user_id}' はカウンセリングモードでないため、リッチメニューをSTARTに設定しました。")
+        save_session(user_id, session, tabs=tabs)
+        return True
+    
+    return False

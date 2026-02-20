@@ -6,7 +6,7 @@
 {% load static %}
 <link rel="stylesheet" href="{% static 'monitor/style.css' %}">
 
-<div class="log-container">
+<div class="log-container" data-user-id="{{ user_id }}" data-last-log-id="{{ latest_log_id }}">
     <h2>対話ログ</h2>
     <div class="log-header">
         <div class="log-meta">ユーザーID: {{ user_id }}</div>
@@ -16,27 +16,28 @@
         <button id="stopButton" data-user-id="{{ user_id }}" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">AIモードに切り替え</button>
         {% endif %}
     </div>
-    <!-- <p>aaa text</p> -->
 
-    {% if logs %}
-        <div class="chat-log">
-            {% for log in logs %}
-                <div class="message {% if log.speaker == 'user' %}user{% else %}assistant{% endif %}">
-                    <div>
-                        <div class="message-meta">
-                            <span class="message-speaker">
-                                {% if log.speaker == 'user' %}ユーザー{% else %}AI{% endif %}
-                            </span>
-                            <span>{{ log.post_time|date:"Y/m/d H:i:s" }}</span>
+    <div class="chat-log-area">
+        {% if logs %}
+            <div class="chat-log">
+                {% for log in logs %}
+                    <div class="message {% if log.speaker == 'user' %}user{% elif log.speaker == 'counselor' %}counselor{% else %}assistant{% endif %}">
+                        <div>
+                            <div class="message-meta">
+                                <span class="message-speaker">
+                                    {% if log.speaker == 'user' %}ユーザー{% elif log.speaker == 'counselor' %}カウンセラー{% else %}AI{% endif %}
+                                </span>
+                                <span>{{ log.post_time|date:"Y/m/d H:i:s" }}</span>
+                            </div>
+                            <div class="message-content">{{ log.message }}</div>
                         </div>
-                        <div class="message-content">{{ log.message }}</div>
                     </div>
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p>ログがありません。</p>
-    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>ログがありません。</p>
+        {% endif %}
+    </div>
 
     <form id="reply-form" method="post" action="{% url 'monitor:send_reply' user_id %}" style="margin-top: 10px;">
         {% csrf_token %}
