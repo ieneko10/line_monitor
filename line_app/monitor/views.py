@@ -152,7 +152,8 @@ def session_stop(request, user_id):
     data = json.loads(request.body)
     user_id = data.get('user_id')
     response_mode = 'Human' if data.get('human') else 'AI'
-    logger.info(f"[Change Mode] User: {user_id}, New Mode: {response_mode}")
+    operator = request.user.username
+    logger.info(f"[Change Mode] User: {user_id}, New Mode: {response_mode}, Operator: {operator}")
     try:
         session = Session.objects.get(user_id=user_id)
         session.session_data['response_mode'] = response_mode
