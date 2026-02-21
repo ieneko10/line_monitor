@@ -4,17 +4,30 @@
 
 {% block content %}
 {% load static %}
-<link rel="stylesheet" href="{% static 'monitor/style.css' %}">
+<link rel="stylesheet" href="{% static 'monitor/monitor_detail.css' %}">
 
 <div class="log-container" data-user-id="{{ user_id }}" data-last-log-id="{{ latest_log_id }}">
     <h2>対話ログ</h2>
     <div class="log-header">
-        <div class="log-meta">ユーザーID: {{ user_id }}</div>
+        <div>
+            <div class="log-meta">ユーザーID: {{ user_id }}</div>
+            <div class="risk-summary-box">
+                <div class="log-meta risk-summary-row">現在のリスク:
+                    <span class="risk-level-badge {% if session.risk_level == 0 %}detail-risk-level-0{% elif session.risk_level == 1 %}detail-risk-level-1{% elif session.risk_level == 2 %}detail-risk-level-2{% elif session.risk_level == 3 %}detail-risk-level-3{% endif %}">{{ session.risk_level|default:"-" }}</span>
+                </div>
+                <div class="log-meta risk-summary-row">判定理由:</div>
+                <div class="risk-level-reason-box {% if session.risk_level == 0 %}detail-risk-level-0{% elif session.risk_level == 1 %}detail-risk-level-1{% elif session.risk_level == 2 %}detail-risk-level-2{% elif session.risk_level == 3 %}detail-risk-level-3{% endif %}">{{ session.risk_level_reason|default:"-" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mode-switch-wrap">
         {% if session.session_data.response_mode == 'AI' or not session.session_data.response_mode %}
         <button id="stopButton" data-user-id="{{ user_id }}" style="padding: 8px 16px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">応答モードに切り替え</button>
         {% else %}
         <button id="stopButton" data-user-id="{{ user_id }}" style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">AIモードに切り替え</button>
         {% endif %}
+        <button id="scrollBottomButton" type="button" style="padding: 8px 16px; margin-left: 8px; background-color: #607d8b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">最下部へ移動</button>
     </div>
 
     <div class="chat-log-area">
@@ -48,6 +61,6 @@
     </form>
 </div>
 
-<script src="{% static 'monitor/script.js' %}"></script>
+<script src="{% static 'monitor/monitor_detail.js' %}"></script>
 
 {% endblock %}

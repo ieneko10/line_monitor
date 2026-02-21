@@ -1,72 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}カウンセリング監視 - {{ block.super }}{% endblock %}
 
 {% block extra_head %}
-<style>
-    .monitor-section {
-        padding: 20px 0;
-    }
-    .monitor-section h2 {
-        font-size: 2em;
-        margin-bottom: 20px;
-        color: #333;
-    }
-    .session-count {
-        padding: 15px;
-        margin-bottom: 20px;
-        background-color: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-        border-radius: 4px;
-        font-size: 1.1em;
-    }
-    .no-sessions {
-        color: #888;
-        margin-top: 20px;
-        padding: 20px;
-        text-align: center;
-        background-color: #f8f9fa;
-        border-radius: 4px;
-        font-size: 1.1em;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    th {
-        background-color: rgb(76, 104, 108);
-        color: white;
-        padding: 12px;
-        text-align: left;
-        font-weight: bold;
-    }
-    td {
-        padding: 10px 12px;
-        border-bottom: 1px solid #ddd;
-    }
-    tr:hover {
-        background-color: #f5f5f5;
-    }
-    tr:last-child td {
-        border-bottom: none;
-    }
-
-    /* レスポンシブ対応 */
-    @media (max-width: 768px) {
-        .monitor-section h2 {
-            font-size: 1.5em;
-        }
-        table {
-            font-size: 0.9em;
-        }
-        th, td {
-            padding: 8px 6px;
-        }
-    }
-</style>
+<link rel="stylesheet" href="{% static 'monitor/monitor.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -80,23 +18,23 @@
             <table>
                 <thead>
                     <tr>
-                        <th>ユーザーID</th>
-                        <th>セッションID</th>
+                        <th>詳細</th>
                         <th>セッション時間（秒）</th>
-                        <th>フラグ</th>
+                        <th>リスクレベル</th>
+                        <th>リスクレベル理由</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for session in sessions %}
                         <tr>
                             <td>
-                                <a href="{% url 'monitor:session_detail' user_id=session.user_id %}" style="text-decoration: none; color: #0066cc;">
-                                    {{ session.user_id }}
+                                <a href="{% url 'monitor:session_detail' user_id=session.user_id %}" class="monitor-user-link">
+                                    詳細
                                 </a>
                             </td>
-                            <td>{{ session.session_data.session_id }}</td>
                             <td>{{ session.time }}</td>
-                            <td>{{ session.flag|default:"-" }}</td>
+                            <td class="{% if session.risk_level == 1 %}risk-level-1{% elif session.risk_level == 2 %}risk-level-2{% elif session.risk_level == 3 %}risk-level-3{% endif %}">{{ session.risk_level }}</td>
+                            <td>{{ session.risk_level_reason|default:"-" }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -106,20 +44,8 @@
         {% endif %}
     </div>
 
-    <script>
-        setInterval(function() {
-            fetch(window.location.href)
-                .then(response => response.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const newDoc = parser.parseFromString(html, 'text/html');
-                    const newContent = newDoc.querySelector('.monitor-section');
-                    const oldContent = document.querySelector('.monitor-section');
-                    if (newContent && oldContent) {
-                        oldContent.replaceWith(newContent);
-                    }
-                })
-                .catch(error => console.error('Update error:', error));
-        }, 5000);
-    </script>
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'monitor/monitor.js' %}"></script>
 {% endblock %}

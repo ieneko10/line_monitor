@@ -48,6 +48,7 @@ def monitor(request):
     for session in sessions:
         if session.session_data and session.session_data.get('counseling_mode', False):
             active_sessions.append(session)
+    active_sessions.sort(key=lambda s: s.risk_level, reverse=True)
     
     context = {
         'sessions': active_sessions,

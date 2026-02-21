@@ -17,6 +17,79 @@
     font-size: 0.95em;
 }
 
+.risk-summary-box {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    background-color: #fff;
+    max-width: 700px;
+}
+
+.risk-summary-row {
+    margin-bottom: 4px;
+}
+
+.mode-switch-wrap {
+    margin-top: 8px;
+    margin-bottom: 10px;
+    text-align: right;
+}
+
+.risk-level-badge {
+    display: inline-block;
+    min-width: 1.8em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 700;
+    text-align: center;
+    margin-left: 4px;
+}
+
+.risk-level-reason-box {
+    margin-top: 4px;
+    margin-bottom: 2px;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background-color: #fafafa;
+    color: #333;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    max-width: 700px;
+}
+
+.detail-risk-level-0 {
+    background-color: #f1f3f5;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+
+.detail-risk-level-1 {
+    background-color: #fff3cd;
+    color: #7a4f00;
+    border: 1px solid #d39e00;
+}
+
+.detail-risk-level-2 {
+    background-color: #ffe8cc;
+    color: #9a3412;
+    border: 1px solid #ea580c;
+}
+
+.detail-risk-level-3 {
+    background-color: #f8d7da;
+    color: #842029;
+    border: 1px solid #dc3545;
+}
+
+.risk-level-reason-box.detail-risk-level-0,
+.risk-level-reason-box.detail-risk-level-1,
+.risk-level-reason-box.detail-risk-level-2,
+.risk-level-reason-box.detail-risk-level-3 {
+    color: #333;
+}
+
 .chat-log {
     border: 1px solid #ddd;
     border-radius: 10px;

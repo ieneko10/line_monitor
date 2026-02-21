@@ -163,6 +163,7 @@ _log_group("LOG", [
     ("LOGGER.SYSTEM", MAIN_CONFIG.get("LOGGER", {}).get("SYSTEM")),
     ("LOGGER.DIALOGUE", MAIN_CONFIG.get("LOGGER", {}).get("DIALOGUE")),
     ("LOGGER.MONITOR", MAIN_CONFIG.get("LOGGER", {}).get("MONITOR")),
+    ("LOGGER.ASYNC_LLM", MAIN_CONFIG.get("LOGGER", {}).get("ASYNC_LLM")),
 ])
 
 # PORT
@@ -209,6 +210,11 @@ _log_group("MODEL", [
     ("GEMINI_MODEL", MAIN_CONFIG.get("GEMINI_MODEL")),
     ("TEMPERATURE", MAIN_CONFIG.get("TEMPERATURE")),
     ("MAX_TOKENS", MAIN_CONFIG.get("MAX_TOKENS")),
+])
+
+# PROMPT
+_log_group("PROMPT", [
+    ("RISK_LEVEL_DETECTION", MAIN_CONFIG.get("PROMPT", {}).get("RISK_LEVEL_DETECTION")),
 ])
 
 # データベースpath

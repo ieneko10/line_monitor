@@ -1,7 +1,12 @@
 document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'stopButton') {
-        const userId = e.target.dataset.userId;
-        const action = e.target.textContent.trim() === '応答モードに切り替え';
+    if (!(e.target instanceof Element)) {
+        return;
+    }
+
+    const stopButton = e.target.closest('#stopButton');
+    if (stopButton) {
+        const userId = stopButton.dataset.userId;
+        const action = stopButton.textContent.trim() === '応答モードに切り替え';
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
         fetch(`/monitor/session/stop/${userId}/`, {
             method: 'POST',
@@ -14,6 +19,20 @@ document.addEventListener('click', function(e) {
         })
         .then(() => window.location.reload())
         .catch(error => console.error('Toggle error:', error));
+        return;
+    }
+
+    const scrollBottomButton = e.target.closest('#scrollBottomButton');
+    if (scrollBottomButton) {
+        const chatLog = document.querySelector('.chat-log');
+
+        if (chatLog) {
+            chatLog.scrollTo({ top: chatLog.scrollHeight, behavior: 'smooth' });
+
+            setTimeout(() => {
+                chatLog.scrollTop = chatLog.scrollHeight;
+            }, 80);
+        }
     }
 });
 

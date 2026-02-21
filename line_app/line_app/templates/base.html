@@ -154,7 +154,7 @@
 
     <nav>
         <div class="nav-container">
-            <a href="/monitor/">監視</a>
+            <a href="/monitor/">セッション一覧</a>
             {% if user.is_authenticated %}
                 <form id="logout-form" method="post" action="/logout/">
                     {% csrf_token %}

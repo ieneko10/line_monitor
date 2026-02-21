@@ -26,6 +26,7 @@ from logger.ansi import *
 from counseling_linebot.models import ChatHistory
 from counseling_linebot.utils import richmenu 
 from counseling_linebot.utils.bot import CounselorBot
+from counseling_linebot.utils.async_llm import risk_level_detection_async
 from counseling_linebot.utils.maintenance import FileChangeHandler, maintenance_mode_on 
 from counseling_linebot.utils.db_handler import (
 	set_maintenance_mode,
@@ -47,6 +48,7 @@ from counseling_linebot.utils.db_handler import (
 	check_and_reset_session,
  	save_dialogue_history,
 	add_reply_token,
+	reset_risk_level,
 )
 from counseling_linebot.utils.tool import (
 	TrackableTimer,
@@ -294,7 +296,7 @@ def handle_postback(event):
 			msg = "すでにカウンセリング対話が開始されています。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
 			reply_to_line_user(event.reply_token, msg)
-			richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id)
+			richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id, tabs=1)
 
 		else:
 			session_time = get_time(user_id)
@@ -337,7 +339,11 @@ def handle_postback(event):
 			with threading.Lock():
 				remaining_time = timers[user_id].remaining_time()
 				remaining_time = remaining_time // 60
-				richmenu.apply_richmenu(richmenu_ids["REMAINING_TIME"][remaining_time], user_id)
+				if remaining_time > 60:
+					time_richmenu_id = richmenu_ids["REMAINING_TIME"]["60over"]
+				else:
+					time_richmenu_id = richmenu_ids["REMAINING_TIME"][remaining_time]
+				richmenu.apply_richmenu(time_richmenu_id, user_id, tabs=1)
 		except KeyError:
 			logger.warning(f"\t[Warning] ユーザ'{user_id}'のタイマーが見つかりませんでした。")
 			richmenu.apply_richmenu(richmenu_ids["START"], user_id, tabs=2)
@@ -350,7 +356,7 @@ def handle_postback(event):
 		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
 			return
 		logger.debug(f"\t[Back to Menu] user {user_id}")
-		richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id)
+		richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id, tabs=1)
 
 	elif event.postback.data == "update_time":
 		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
@@ -368,7 +374,7 @@ def handle_postback(event):
 				session["counseling_mode"] = False
 				save_session(user_id, session)
 				return
-		richmenu.apply_richmenu(richmenu_ids["REMAINING_TIME"][remaining_time], user_id)
+		richmenu.apply_richmenu(richmenu_ids["REMAINING_TIME"][remaining_time], user_id, tabs=1)
 
 	elif event.postback.data == "end_survey":
 		if check_and_reset_session(user_id, richmenu_ids, tabs=1):
@@ -385,12 +391,12 @@ def handle_postback(event):
 		logger.debug(f"\t[Save Flag] flag: end_survey, user: {user_id}")
 	elif event.postback.data == "maintenance":
 		logger.warning(
-			f"[WARNING] user: {user_id}  メンテナンス状態でないのに，メンテナンスメニューが適用されています。\n  再度リッチメニューを更新します。"
+			f"\t[WARNING] user: {user_id}  メンテナンス状態でないのに，メンテナンスメニューが適用されています。\n  再度リッチメニューを更新します。"
 		)
 		if session["keyword_accepted"] == False:
-			richmenu.apply_richmenu(richmenu_ids["MAINTENANCE"], user_id)
+			richmenu.apply_richmenu(richmenu_ids["MAINTENANCE"], user_id, tabs=1)
 		else:
-			richmenu.apply_richmenu(richmenu_ids["START"], user_id)
+			richmenu.apply_richmenu(richmenu_ids["START"], user_id, tabs=1)
 
 
 # ユーザからメッセージを受信したときのハンドラ
@@ -423,7 +429,7 @@ def handle_message(event):
 			msg = "ご同意ありがとうございます。メニューのShopからご希望の時間を選択してください。"
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\t{repr(msg)}")
 			reply_to_line_user(event.reply_token, msg)
-			richmenu.apply_richmenu(richmenu_ids["START"], user_id)
+			richmenu.apply_richmenu(richmenu_ids["START"], user_id, tabs=1)
 
 		else:
 			session["keyword_accepted"] = False
@@ -446,6 +452,7 @@ def handle_message(event):
 			timer.start()
 			with threading.Lock():
 				timers[user_id] = timer
+				logger.info(f"\t[Start Timer] user: {user_id}, time: {session_time} seconds")
 
 			session["counseling_mode"] = True
 			# session["session_id"] = generate_session_id(n=10)
@@ -454,8 +461,9 @@ def handle_message(event):
 				f"\t[Save Session] user: {user_id}\n\t\tcounseling_mode: {session['counseling_mode']}\n\t\tsessionID: {session['session_id']}"
 			)
 
-			richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id)
+			richmenu.apply_richmenu(richmenu_ids["COUNSELING"], user_id, tabs=1)
 
+			reset_risk_level(user_id, tabs=1)
 			if session["finished"] == True:
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\tカウンセリング対話の開始メッセージを送信")
 				start_chat(event)
@@ -492,6 +500,7 @@ def handle_message(event):
 				],
 			)
 			bot.finish_dialogue(user_id)
+			reset_risk_level(user_id, tabs=1)
 			session["session_id"] = generate_session_id(n=10)
 			if session["counseling_mode"] == True:
 				save_session(user_id, session)
@@ -531,7 +540,6 @@ def handle_message(event):
 						del timers[user_id]
 				except KeyError:
 					logger.warning(f"\t[Warning] ユーザ'{user_id}'のタイマーが見つかりませんでした。")
-					remaining_time = 0
 					if session["counseling_mode"] == True:
 						logger.warning(f"\t[Warning] ユーザ'{user_id}'はカウンセリングモードですが、タイマーが見つかりませんでした。セッションをリセットします。")
 						session["counseling_mode"] = False
@@ -555,17 +563,27 @@ def handle_message(event):
 			logger.debug(f"\t[Send Message] user: {user_id}\n\t\tカウンセリング対話のメッセージを送信")
 			mode = session['response_mode']
 			logger.info(f"\t[Mode] {mode}, type:{type(event.reply_token)}")
-			add_reply_token(user_id, event.reply_token)
+			add_reply_token(user_id, event.reply_token, tabs=1)
+   
+			if isinstance(event.message, StickerMessageContent):
+				msg = f"スタンプ（意図）: {event.message.keywords}"
+			elif isinstance(event.message, TextMessageContent):
+				msg = event.message.text
+			else:
+				logger.warning(f"\t[Warning] 非対応のメッセージタイプ: {type(event.message)}")
+				return
+   
+			# 非同期でリスクレベルの検出を行うスレッドを起動
+			logger.info(f"\t[Risk Detection] 非同期でリスクレベルの検出を行うスレッドを起動")
+			risk_thread = threading.Thread(
+				target=risk_level_detection_async,
+				args=(user_id, session.get("session_id", ""), msg),
+				daemon=True,
+			)
+			risk_thread.start()
    
 			if session['response_mode'] == 'Human':
 				
-				if isinstance(event.message, StickerMessageContent):
-					msg = f"スタンプ（意図）: {event.message.keywords}"
-				elif isinstance(event.message, TextMessageContent):
-					msg = event.message.text
-				else:
-					logger.warning(f"\t[Warning] 非対応のメッセージタイプ: {type(event.message)}")
-					return
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t人間が対応中のため、メッセージを送信せずに終了")
 				post_time = timezone.now()
 				logger.debug(f"\t[Save Dialogue History] message: {msg}")
@@ -579,6 +597,7 @@ def handle_message(event):
 				)
 				save_dialogue_history(user_id, 'user', msg, session["session_id"], post_time)
 				return
+
 			else:     # response_mode == 'AI'
 				reply(event, tunnel)
 

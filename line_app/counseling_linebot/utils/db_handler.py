@@ -150,6 +150,17 @@ def set_time(user_id, seconds, tabs=0):
 def reset_time(user_id):
     Session.objects.filter(user_id=user_id).update(time=0)
 
+
+def reset_risk_level(user_id, tabs=0):
+    """
+    ユーザのリスクレベルを初期値(0)にリセットする
+    """
+    updated = Session.objects.filter(user_id=user_id).update(risk_level=0)
+    if not updated:
+        indent = "\t" * tabs
+        logger.error(f"{indent}user_id '{user_id}' が sessions テーブルに存在しません。")
+
+
 def init_survey(user_id, tabs=0):
     """
     ユーザのアンケートを初期化する
