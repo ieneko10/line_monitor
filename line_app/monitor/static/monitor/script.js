@@ -90,7 +90,7 @@ setInterval(function() {
                 .catch(error => console.error('Update error:', error));
         })
         .catch(error => console.error('Status check error:', error));
-}, 5000);
+}, 1000);
 
 
 

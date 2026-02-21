@@ -162,6 +162,7 @@ def _log_group(title: str, items: list[tuple[str, object]]) -> None:
 _log_group("LOG", [
     ("LOGGER.SYSTEM", MAIN_CONFIG.get("LOGGER", {}).get("SYSTEM")),
     ("LOGGER.DIALOGUE", MAIN_CONFIG.get("LOGGER", {}).get("DIALOGUE")),
+    ("LOGGER.MONITOR", MAIN_CONFIG.get("LOGGER", {}).get("MONITOR")),
 ])
 
 # PORT

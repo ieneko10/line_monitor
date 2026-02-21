@@ -21,7 +21,7 @@ from logger.ansi import *
 
 # ロガーと設定の読み込み
 conf = settings.MAIN_CONFIG
-logger = start_logger(conf["LOGGER"]["SYSTEM"])
+logger = start_logger(conf["LOGGER"]["MONITOR"])
 
 def sample_view(request):
     return render(request, 'sample.html')
@@ -188,9 +188,9 @@ def send_reply(request, user_id):
         save_dialogue_history(user_id, 'counselor', message, session_id, post_time)
         
     except ApiException as e:
-        logger.error(f"Failed to send reply: {e}")
+        logger.error(f"[Error] Failed to send reply: {e}")
     
     except Exception as e:
-        logger.error(f'??? Unexpected error')
+        logger.error(f'[Error] Unexpected error: {e}')
     
-    return redirect('monitor:session_detail', user_id=user_id)
+    return redirect('monitor:session_detail', user_id=user_id) 

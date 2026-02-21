@@ -262,7 +262,7 @@ def add_reply_token(user_id, token, tabs=0):
 
 
 def delete_expired_reply_tokens(tabs=0):
-    cutoff = timezone.now() - timedelta(minutes=3)
+    cutoff = timezone.now() - timedelta(minutes=30)
     deleted_count, _ = ReplyToken.objects.filter(created_at__lt=cutoff).delete()
     indent = "\t" * tabs
     logger.debug(f"{indent}[Delete ReplyToken] deleted: {deleted_count}")

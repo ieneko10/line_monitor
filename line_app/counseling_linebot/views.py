@@ -9,12 +9,12 @@ from ruamel.yaml import YAML
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from django.utils import timezone
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration
-from linebot.v3.webhooks import MessageEvent, FollowEvent, PostbackEvent
-from django.conf import settings
-from django.utils import timezone
+from linebot.v3.webhooks import MessageEvent, FollowEvent, PostbackEvent, StickerMessageContent, TextMessageContent
 
 # 既存実装の再利用（Flask版と同等機能）
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -556,19 +556,28 @@ def handle_message(event):
 			mode = session['response_mode']
 			logger.info(f"\t[Mode] {mode}, type:{type(event.reply_token)}")
 			add_reply_token(user_id, event.reply_token)
+   
 			if session['response_mode'] == 'Human':
+				
+				if isinstance(event.message, StickerMessageContent):
+					msg = f"スタンプ（意図）: {event.message.keywords}"
+				elif isinstance(event.message, TextMessageContent):
+					msg = event.message.text
+				else:
+					logger.warning(f"\t[Warning] 非対応のメッセージタイプ: {type(event.message)}")
+					return
 				logger.debug(f"\t[Send Message] user: {user_id}\n\t\t人間が対応中のため、メッセージを送信せずに終了")
 				post_time = timezone.now()
-				logger.debug(f"\t[Save Dialogue History] message: {event.message.text}")
+				logger.debug(f"\t[Save Dialogue History] message: {msg}")
 				ChatHistory.objects.create(
 					user_id=user_id,
 					speaker="user",
-					message=event.message.text,
+					message=msg,
 					post_time=post_time,
 					finished=0,
 					session_id=session["session_id"],
 				)
-				save_dialogue_history(user_id, 'user', event.message.text, session["session_id"], post_time)
+				save_dialogue_history(user_id, 'user', msg, session["session_id"], post_time)
 				return
 			else:     # response_mode == 'AI'
 				reply(event, tunnel)
